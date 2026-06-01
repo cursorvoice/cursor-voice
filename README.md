@@ -22,12 +22,22 @@ A native macOS voice assistant that lives next to your cursor. Press a hotkey, t
 
 ## Install
 
-### Homebrew (cask)
+### One-line installer (curl)
 
 ```bash
-brew tap tottenabderrahmane1-create/cursor-voice https://github.com/tottenabderrahmane1-create/cursor-voice
+curl -fsSL https://raw.githubusercontent.com/tottenabderrahmane1-create/cursor-voice/main/install.sh | bash
+```
+
+Downloads the latest release, copies the app into `/Applications`, strips the quarantine attribute, and launches it. Done.
+
+### Homebrew
+
+```bash
+brew tap tottenabderrahmane1-create/cursor-voice
 brew install --cask cursor-voice
 ```
+
+The cask's `postflight` strips quarantine automatically — no right-click-Open dance.
 
 ### Manual
 
@@ -35,7 +45,7 @@ brew install --cask cursor-voice
 2. Open it, drag **Cursor Voice** into Applications.
 3. **First launch**: macOS Gatekeeper will refuse to open it (it's ad-hoc signed, no paid Developer ID). Fix with one of:
    - **Right-click the app → Open** → confirm in the dialog.
-   - Or: `xattr -d com.apple.quarantine /Applications/CursorVoice.app && open /Applications/CursorVoice.app`
+   - Or: `xattr -dr com.apple.quarantine /Applications/CursorVoice.app && open /Applications/CursorVoice.app`
 
 You'll see a small aurora orb appear in the menu bar.
 
