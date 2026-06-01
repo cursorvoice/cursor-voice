@@ -1,0 +1,642 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Cursor Voice — talk to your Mac</title>
+<meta name="description" content="A native macOS voice assistant that lives next to your cursor. It sees your screen, drives your Mac, and answers back — powered by the OpenAI Realtime API. Early beta, open source." />
+<meta property="og:title" content="Cursor Voice" />
+<meta property="og:description" content="Talk to your Mac. It sees your screen and does the thing. Early beta, open source." />
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet" />
+<style>
+  :root {
+    --violet: #8c4cf2;
+    --pink:   #f773c7;
+    --sky:    #66c7ff;
+    --mint:   #6bf7e5;
+
+    --bg:        #07070b;
+    --bg-2:      #0c0c14;
+    --surface:   rgba(255,255,255,0.035);
+    --surface-2: rgba(255,255,255,0.06);
+    --border:    rgba(255,255,255,0.09);
+    --border-2:  rgba(255,255,255,0.14);
+    --fg:        #f4f4f8;
+    --fg-dim:    #a4a4b4;
+    --fg-faint:  #6c6c7e;
+
+    --radius: 18px;
+    --maxw: 1120px;
+    --ease: cubic-bezier(.22,.61,.36,1);
+  }
+
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  html { scroll-behavior: smooth; -webkit-text-size-adjust: 100%; }
+
+  body {
+    font-family: 'Inter', system-ui, -apple-system, sans-serif;
+    background: var(--bg);
+    color: var(--fg);
+    line-height: 1.6;
+    overflow-x: hidden;
+    -webkit-font-smoothing: antialiased;
+    text-rendering: optimizeLegibility;
+  }
+
+  /* ── ambient background gradient field ─────────────────────────── */
+  .field {
+    position: fixed;
+    inset: 0;
+    z-index: -2;
+    background:
+      radial-gradient(60vw 60vw at 18% -8%, rgba(140,76,242,.20), transparent 60%),
+      radial-gradient(55vw 55vw at 92% 8%, rgba(247,115,199,.14), transparent 60%),
+      radial-gradient(70vw 70vw at 50% 110%, rgba(102,199,255,.12), transparent 55%);
+    filter: saturate(1.1);
+  }
+  .grain {
+    position: fixed; inset: 0; z-index: -1; pointer-events: none; opacity: .4;
+    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='120' height='120'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='3' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)' opacity='0.5'/%3E%3C/svg%3E");
+    mix-blend-mode: overlay;
+  }
+
+  .wrap { max-width: var(--maxw); margin: 0 auto; padding: 0 24px; }
+
+  /* ── nav ───────────────────────────────────────────────────────── */
+  nav {
+    position: sticky; top: 0; z-index: 100;
+    backdrop-filter: blur(18px) saturate(1.4);
+    -webkit-backdrop-filter: blur(18px) saturate(1.4);
+    background: rgba(7,7,11,.55);
+    border-bottom: 1px solid transparent;
+    transition: border-color .3s, background .3s;
+  }
+  nav.scrolled { border-bottom-color: var(--border); background: rgba(7,7,11,.78); }
+  nav .wrap { display: flex; align-items: center; justify-content: space-between; height: 64px; }
+  .brand { display: flex; align-items: center; gap: 11px; font-weight: 600; font-size: 16px; letter-spacing: -.01em; }
+  .brand .mark {
+    width: 26px; height: 26px; border-radius: 50%;
+    background: conic-gradient(from 0deg, var(--violet), var(--pink), var(--sky), var(--mint), var(--violet));
+    box-shadow: 0 0 16px rgba(140,76,242,.6);
+    animation: spin 7s linear infinite;
+    position: relative;
+  }
+  .brand .mark::after {
+    content: ''; position: absolute; inset: 5px; border-radius: 50%;
+    background: radial-gradient(circle at 35% 30%, rgba(255,255,255,.9), rgba(255,255,255,.15) 55%, transparent);
+  }
+  @keyframes spin { to { transform: rotate(360deg); } }
+  .nav-links { display: flex; align-items: center; gap: 28px; }
+  .nav-links a { color: var(--fg-dim); text-decoration: none; font-size: 14px; font-weight: 450; transition: color .2s; }
+  .nav-links a:hover { color: var(--fg); }
+  .nav-cta {
+    display: inline-flex; align-items: center; gap: 7px;
+    padding: 8px 15px; border-radius: 10px; font-size: 13.5px; font-weight: 550;
+    color: var(--fg); text-decoration: none;
+    background: var(--surface-2); border: 1px solid var(--border-2);
+    transition: transform .2s var(--ease), background .2s, border-color .2s;
+  }
+  .nav-cta:hover { background: rgba(255,255,255,.1); border-color: rgba(255,255,255,.25); transform: translateY(-1px); }
+  .nav-links .hide-sm { display: inline; }
+  @media (max-width: 680px){ .nav-links .hide-sm { display: none; } }
+
+  /* ── hero ──────────────────────────────────────────────────────── */
+  header { position: relative; padding: 86px 0 70px; text-align: center; }
+  .beta {
+    display: inline-flex; align-items: center; gap: 8px;
+    padding: 6px 13px; border-radius: 999px;
+    font-size: 12.5px; font-weight: 500; letter-spacing: .01em; color: var(--mint);
+    background: rgba(107,247,229,.07); border: 1px solid rgba(107,247,229,.22);
+    margin-bottom: 30px;
+  }
+  .beta .dot { width: 7px; height: 7px; border-radius: 50%; background: var(--mint); box-shadow: 0 0 8px var(--mint); animation: pulse 2s ease-in-out infinite; }
+  @keyframes pulse { 0%,100%{ opacity: 1; transform: scale(1);} 50%{ opacity: .4; transform: scale(.8);} }
+
+  h1 {
+    font-size: clamp(40px, 7.5vw, 78px); line-height: 1.02; font-weight: 700;
+    letter-spacing: -.035em; margin-bottom: 22px;
+  }
+  h1 .grad {
+    background: linear-gradient(110deg, var(--violet), var(--pink) 38%, var(--sky) 70%, var(--mint));
+    background-size: 220% 100%;
+    -webkit-background-clip: text; background-clip: text; color: transparent;
+    animation: shift 8s ease infinite;
+  }
+  @keyframes shift { 0%,100%{ background-position: 0% 50%; } 50%{ background-position: 100% 50%; } }
+  .sub { max-width: 600px; margin: 0 auto 38px; font-size: clamp(16px,2.2vw,19px); color: var(--fg-dim); font-weight: 350; }
+  .sub b { color: var(--fg); font-weight: 550; }
+
+  .cta-row { display: flex; gap: 13px; justify-content: center; flex-wrap: wrap; margin-bottom: 14px; }
+  .btn {
+    display: inline-flex; align-items: center; gap: 9px;
+    padding: 13px 22px; border-radius: 12px; font-size: 15px; font-weight: 550;
+    text-decoration: none; cursor: pointer; border: 1px solid transparent;
+    transition: transform .22s var(--ease), box-shadow .22s, background .2s, border-color .2s;
+  }
+  .btn-primary {
+    color: #0a0a0f;
+    background: linear-gradient(110deg, var(--violet), var(--pink) 45%, var(--sky));
+    background-size: 180% 100%;
+    box-shadow: 0 8px 30px rgba(140,76,242,.35);
+  }
+  .btn-primary:hover { transform: translateY(-2px); box-shadow: 0 14px 40px rgba(140,76,242,.5); background-position: 100% 0; }
+  .btn-ghost { color: var(--fg); background: var(--surface); border-color: var(--border-2); }
+  .btn-ghost:hover { background: var(--surface-2); border-color: rgba(255,255,255,.28); transform: translateY(-2px); }
+  .req { font-size: 13px; color: var(--fg-faint); margin-top: 6px; }
+
+  /* ── orb ───────────────────────────────────────────────────────── */
+  .orb-stage { position: relative; height: clamp(260px, 38vw, 420px); display: grid; place-items: center; margin-top: 36px; }
+  .orb-wrap { position: relative; width: clamp(150px, 26vw, 240px); aspect-ratio: 1; }
+  .orb {
+    position: absolute; inset: 0; border-radius: 50%;
+    background:
+      radial-gradient(circle at 36% 30%, rgba(255,255,255,.95), rgba(255,255,255,.4) 18%, transparent 42%),
+      conic-gradient(from 220deg, var(--violet), var(--pink), var(--sky), var(--mint), var(--violet));
+    filter: saturate(1.25);
+    box-shadow:
+      0 0 60px rgba(140,76,242,.55),
+      0 0 120px rgba(247,115,199,.3),
+      inset 0 0 50px rgba(255,255,255,.18);
+    animation: spin 14s linear infinite, breathe 4.5s ease-in-out infinite;
+  }
+  .orb::before {
+    content: ''; position: absolute; inset: 14%; border-radius: 50%;
+    background: conic-gradient(from 90deg, var(--mint), var(--sky), var(--violet), var(--pink), var(--mint));
+    filter: blur(14px); opacity: .85; animation: spin 9s linear infinite reverse;
+  }
+  .orb::after {
+    content: ''; position: absolute; inset: 0; border-radius: 50%;
+    box-shadow: inset 0 0 30px 4px rgba(255,255,255,.25);
+  }
+  @keyframes breathe { 0%,100%{ transform: scale(1);} 50%{ transform: scale(1.05);} }
+  .ring {
+    position: absolute; inset: -10%; border-radius: 50%;
+    border: 1px solid rgba(255,255,255,.10);
+    animation: ripple 4.5s ease-out infinite;
+  }
+  .ring.r2 { animation-delay: 1.5s; }
+  .ring.r3 { animation-delay: 3s; }
+  @keyframes ripple { 0%{ transform: scale(.85); opacity: .8;} 100%{ transform: scale(1.8); opacity: 0;} }
+
+  .cursor-hint {
+    position: absolute; bottom: 8%; right: 14%;
+    display: flex; align-items: center; gap: 8px;
+    font-size: 13px; color: var(--fg-dim);
+    background: rgba(10,10,16,.7); backdrop-filter: blur(8px);
+    border: 1px solid var(--border); border-radius: 999px; padding: 6px 12px;
+    animation: floaty 5s ease-in-out infinite;
+  }
+  @keyframes floaty { 0%,100%{ transform: translateY(0);} 50%{ transform: translateY(-7px);} }
+
+  /* transcript line under orb */
+  .transcript { margin-top: 24px; height: 26px; font-size: 15px; color: var(--fg-dim); font-weight: 350; }
+  .transcript .typed { color: var(--fg); }
+  .transcript .caret { display: inline-block; width: 2px; height: 1.05em; background: var(--mint); margin-left: 2px; vertical-align: -2px; animation: blink 1s steps(2) infinite; }
+  @keyframes blink { 50%{ opacity: 0; } }
+
+  /* ── sections ──────────────────────────────────────────────────── */
+  section { padding: 80px 0; position: relative; }
+  .eyebrow { font-size: 13px; font-weight: 600; letter-spacing: .08em; text-transform: uppercase; color: var(--sky); margin-bottom: 14px; }
+  h2 { font-size: clamp(28px, 4.5vw, 42px); font-weight: 650; letter-spacing: -.025em; line-height: 1.1; margin-bottom: 16px; }
+  .lead { font-size: 17px; color: var(--fg-dim); max-width: 580px; font-weight: 350; }
+  .section-head { margin-bottom: 48px; }
+
+  /* feature cards */
+  .grid { display: grid; gap: 18px; grid-template-columns: repeat(3, 1fr); }
+  @media (max-width: 900px){ .grid { grid-template-columns: repeat(2,1fr);} }
+  @media (max-width: 600px){ .grid { grid-template-columns: 1fr;} }
+  .card {
+    position: relative; padding: 26px; border-radius: var(--radius);
+    background: var(--surface); border: 1px solid var(--border);
+    transition: transform .3s var(--ease), border-color .3s, background .3s;
+    overflow: hidden;
+  }
+  .card::before {
+    content: ''; position: absolute; inset: 0; border-radius: inherit; padding: 1px;
+    background: linear-gradient(135deg, transparent, transparent);
+    -webkit-mask: linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0);
+    -webkit-mask-composite: xor; mask-composite: exclude;
+    opacity: 0; transition: opacity .3s;
+  }
+  .card:hover { transform: translateY(-4px); background: var(--surface-2); border-color: var(--border-2); }
+  .card .ico {
+    width: 42px; height: 42px; border-radius: 11px; display: grid; place-items: center;
+    background: linear-gradient(135deg, rgba(140,76,242,.18), rgba(102,199,255,.14));
+    border: 1px solid var(--border-2); margin-bottom: 16px;
+  }
+  .card .ico svg { width: 21px; height: 21px; stroke: var(--fg); fill: none; stroke-width: 1.6; }
+  .card h3 { font-size: 17px; font-weight: 600; margin-bottom: 7px; letter-spacing: -.01em; }
+  .card p { font-size: 14.5px; color: var(--fg-dim); font-weight: 350; }
+
+  /* how it works steps */
+  .steps { display: grid; gap: 0; }
+  .step {
+    display: grid; grid-template-columns: 54px 1fr; gap: 22px; padding: 26px 0;
+    border-top: 1px solid var(--border);
+  }
+  .step:last-child { border-bottom: 1px solid var(--border); }
+  .step .n {
+    width: 42px; height: 42px; border-radius: 50%; display: grid; place-items: center;
+    font-weight: 600; font-size: 16px; font-family: 'JetBrains Mono', monospace;
+    background: var(--surface-2); border: 1px solid var(--border-2);
+    color: var(--mint);
+  }
+  .step h3 { font-size: 18px; font-weight: 600; margin-bottom: 5px; }
+  .step p { color: var(--fg-dim); font-size: 15px; font-weight: 350; }
+  .step code { font-family: 'JetBrains Mono', monospace; font-size: 13px; background: var(--surface-2); padding: 2px 6px; border-radius: 5px; color: var(--sky); }
+
+  /* tool chips */
+  .tools { display: flex; flex-wrap: wrap; gap: 11px; }
+  .tool {
+    display: inline-flex; align-items: center; gap: 9px;
+    padding: 10px 15px; border-radius: 11px; font-size: 14px; font-weight: 450;
+    background: var(--surface); border: 1px solid var(--border);
+    transition: transform .2s var(--ease), border-color .2s, background .2s;
+  }
+  .tool:hover { transform: translateY(-2px); border-color: var(--border-2); background: var(--surface-2); }
+  .tool .pip { width: 8px; height: 8px; border-radius: 50%; }
+  .tool code { font-family: 'JetBrains Mono', monospace; font-size: 12.5px; color: var(--fg); }
+  .tool span { color: var(--fg-dim); font-size: 13px; }
+
+  /* install */
+  .install-grid { display: grid; grid-template-columns: 1.3fr 1fr; gap: 18px; align-items: start; }
+  @media (max-width: 820px){ .install-grid { grid-template-columns: 1fr; } }
+  .term {
+    border-radius: var(--radius); overflow: hidden; border: 1px solid var(--border-2);
+    background: #050507; box-shadow: 0 20px 60px rgba(0,0,0,.5);
+  }
+  .term-bar { display: flex; align-items: center; gap: 7px; padding: 12px 15px; background: rgba(255,255,255,.04); border-bottom: 1px solid var(--border); }
+  .term-bar .d { width: 11px; height: 11px; border-radius: 50%; }
+  .term-bar .t { margin-left: 10px; font-size: 12.5px; color: var(--fg-faint); font-family: 'JetBrains Mono', monospace; }
+  .term-body { padding: 20px; font-family: 'JetBrains Mono', monospace; font-size: 13.5px; line-height: 1.9; }
+  .term-body .row { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
+  .term-body .ln { color: var(--fg); word-break: break-all; }
+  .term-body .ln .pr { color: var(--mint); user-select: none; }
+  .term-body .ln .cm { color: var(--sky); }
+  .term-body .muted { color: var(--fg-faint); }
+  .copy {
+    flex-shrink: 0; cursor: pointer; font-family: 'Inter', sans-serif; font-size: 12px; font-weight: 500;
+    padding: 5px 11px; border-radius: 8px; color: var(--fg-dim);
+    background: var(--surface-2); border: 1px solid var(--border-2);
+    transition: all .2s;
+  }
+  .copy:hover { color: var(--fg); border-color: rgba(255,255,255,.3); }
+  .copy.ok { color: var(--mint); border-color: rgba(107,247,229,.4); }
+  .install-alt { display: flex; flex-direction: column; gap: 13px; }
+  .alt-card { padding: 20px; border-radius: var(--radius); background: var(--surface); border: 1px solid var(--border); }
+  .alt-card h4 { font-size: 15px; font-weight: 600; margin-bottom: 6px; display: flex; align-items: center; gap: 8px; }
+  .alt-card p { font-size: 13.5px; color: var(--fg-dim); font-weight: 350; }
+  .alt-card a { color: var(--sky); text-decoration: none; }
+  .alt-card a:hover { text-decoration: underline; }
+
+  /* honesty / WIP */
+  .wip {
+    border-radius: var(--radius); padding: clamp(28px, 4vw, 44px);
+    background: linear-gradient(135deg, rgba(247,115,199,.07), rgba(140,76,242,.05));
+    border: 1px solid rgba(247,115,199,.2);
+  }
+  .wip h2 { margin-bottom: 10px; }
+  .wip-list { display: grid; gap: 14px; margin-top: 26px; grid-template-columns: 1fr 1fr; }
+  @media (max-width: 700px){ .wip-list { grid-template-columns: 1fr; } }
+  .wip-item { display: flex; gap: 12px; align-items: flex-start; }
+  .wip-item .ck { flex-shrink: 0; width: 20px; height: 20px; margin-top: 2px; }
+  .wip-item .ck svg { width: 20px; height: 20px; }
+  .wip-item p { font-size: 14.5px; color: var(--fg-dim); font-weight: 350; }
+  .wip-item p b { color: var(--fg); font-weight: 550; }
+
+  /* footer */
+  footer { padding: 56px 0 40px; border-top: 1px solid var(--border); }
+  .foot-grid { display: flex; align-items: center; justify-content: space-between; gap: 24px; flex-wrap: wrap; }
+  .foot-links { display: flex; gap: 22px; flex-wrap: wrap; }
+  .foot-links a { color: var(--fg-dim); text-decoration: none; font-size: 14px; transition: color .2s; }
+  .foot-links a:hover { color: var(--fg); }
+  .foot-note { font-size: 13px; color: var(--fg-faint); margin-top: 18px; }
+  .foot-note a { color: var(--fg-dim); }
+
+  /* scroll reveal */
+  .reveal { opacity: 0; transform: translateY(26px); transition: opacity .7s var(--ease), transform .7s var(--ease); }
+  .reveal.in { opacity: 1; transform: none; }
+  .reveal.d1 { transition-delay: .08s; }
+  .reveal.d2 { transition-delay: .16s; }
+  .reveal.d3 { transition-delay: .24s; }
+
+  @media (prefers-reduced-motion: reduce) {
+    *, *::before, *::after { animation: none !important; transition: none !important; }
+    .reveal { opacity: 1; transform: none; }
+    html { scroll-behavior: auto; }
+  }
+
+  :focus-visible { outline: 2px solid var(--sky); outline-offset: 3px; border-radius: 4px; }
+</style>
+</head>
+<body>
+<div class="field" aria-hidden="true"></div>
+<div class="grain" aria-hidden="true"></div>
+
+<nav id="nav">
+  <div class="wrap">
+    <a href="#top" class="brand"><span class="mark"></span> Cursor Voice</a>
+    <div class="nav-links">
+      <a href="#what" class="hide-sm">What it does</a>
+      <a href="#how" class="hide-sm">How it works</a>
+      <a href="#install">Install</a>
+      <a class="nav-cta" href="https://github.com/tottenabderrahmane1-create/cursor-voice" target="_blank" rel="noopener">
+        <svg width="15" height="15" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M12 .5C5.6.5.5 5.7.5 12c0 5.1 3.3 9.4 7.9 10.9.6.1.8-.3.8-.6v-2c-3.2.7-3.9-1.4-3.9-1.4-.5-1.3-1.3-1.7-1.3-1.7-1.1-.7 0-.7 0-.7 1.2 0 1.8 1.2 1.8 1.2 1 1.8 2.7 1.3 3.4 1 .1-.8.4-1.3.7-1.6-2.6-.3-5.3-1.3-5.3-5.7 0-1.3.5-2.3 1.2-3.1-.1-.3-.5-1.5.1-3.1 0 0 1-.3 3.3 1.2a11.4 11.4 0 0 1 6 0c2.3-1.5 3.3-1.2 3.3-1.2.6 1.6.2 2.8.1 3.1.8.8 1.2 1.8 1.2 3.1 0 4.4-2.7 5.4-5.3 5.7.4.4.8 1.1.8 2.2v3.3c0 .3.2.7.8.6 4.6-1.5 7.9-5.8 7.9-10.9C23.5 5.7 18.4.5 12 .5z"/></svg>
+        GitHub
+      </a>
+    </div>
+  </div>
+</nav>
+
+<a id="top"></a>
+<header>
+  <div class="wrap">
+    <div class="beta"><span class="dot"></span> Early beta · work in progress · open source</div>
+    <h1>Talk to your Mac.<br><span class="grad">It sees, and does the thing.</span></h1>
+    <p class="sub">A native macOS assistant that lives next to your cursor. Press a hotkey, speak, and it <b>reads your screen</b>, <b>clicks and types for you</b>, and answers back in voice — powered by the OpenAI Realtime API.</p>
+    <div class="cta-row">
+      <a class="btn btn-primary" href="#install">
+        <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 3v12m0 0l-4-4m4 4l4-4M4 21h16"/></svg>
+        Install it
+      </a>
+      <a class="btn btn-ghost" href="https://github.com/tottenabderrahmane1-create/cursor-voice" target="_blank" rel="noopener">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M12 .5C5.6.5.5 5.7.5 12c0 5.1 3.3 9.4 7.9 10.9.6.1.8-.3.8-.6v-2c-3.2.7-3.9-1.4-3.9-1.4-.5-1.3-1.3-1.7-1.3-1.7-1.1-.7 0-.7 0-.7 1.2 0 1.8 1.2 1.8 1.2 1 1.8 2.7 1.3 3.4 1 .1-.8.4-1.3.7-1.6-2.6-.3-5.3-1.3-5.3-5.7 0-1.3.5-2.3 1.2-3.1-.1-.3-.5-1.5.1-3.1 0 0 1-.3 3.3 1.2a11.4 11.4 0 0 1 6 0c2.3-1.5 3.3-1.2 3.3-1.2.6 1.6.2 2.8.1 3.1.8.8 1.2 1.8 1.2 3.1 0 4.4-2.7 5.4-5.3 5.7.4.4.8 1.1.8 2.2v3.3c0 .3.2.7.8.6 4.6-1.5 7.9-5.8 7.9-10.9C23.5 5.7 18.4.5 12 .5z"/></svg>
+        View source
+      </a>
+    </div>
+    <p class="req">macOS 14+ · Apple Silicon · bring your own OpenAI API key</p>
+
+    <div class="orb-stage" aria-hidden="true">
+      <div class="orb-wrap">
+        <span class="ring"></span><span class="ring r2"></span><span class="ring r3"></span>
+        <div class="orb"></div>
+        <div class="cursor-hint">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor"><path d="M4 2l16 7-7 2-2 7z"/></svg>
+          follows your cursor
+        </div>
+      </div>
+    </div>
+    <div class="transcript" aria-hidden="true"><span class="typed" id="typed"></span><span class="caret"></span></div>
+  </div>
+</header>
+
+<!-- WHAT IT DOES -->
+<section id="what">
+  <div class="wrap">
+    <div class="section-head reveal">
+      <div class="eyebrow">What it does</div>
+      <h2>Voice in. Action out.</h2>
+      <p class="lead">No window to switch to, no copy-paste. The orb appears at your cursor, listens, and acts on whatever's in front of you.</p>
+    </div>
+    <div class="grid">
+      <div class="card reveal">
+        <div class="ico"><svg viewBox="0 0 24 24"><path d="M12 2a3 3 0 0 1 3 3v6a3 3 0 0 1-6 0V5a3 3 0 0 1 3-3z"/><path d="M19 10v1a7 7 0 0 1-14 0v-1M12 18v4"/></svg></div>
+        <h3>Real-time voice</h3>
+        <p>Streams your voice to the OpenAI Realtime API and talks back. Interrupt it mid-sentence — it stops cleanly and listens.</p>
+      </div>
+      <div class="card reveal d1">
+        <div class="ico"><svg viewBox="0 0 24 24"><rect x="3" y="4" width="18" height="14" rx="2"/><path d="M8 21h8M12 18v3"/></svg></div>
+        <h3>Sees your screen</h3>
+        <p>Captures the display so it can answer about what you're looking at — and verify its own actions with a fresh screenshot after each one.</p>
+      </div>
+      <div class="card reveal d2">
+        <div class="ico"><svg viewBox="0 0 24 24"><path d="M4 2l16 7-7 2-2 7z"/></svg></div>
+        <h3>Drives the Mac</h3>
+        <p>Clicks buttons by name through the Accessibility tree, types, scrolls, runs AppleScript and shell. Mouse simulation only as a last resort.</p>
+      </div>
+      <div class="card reveal">
+        <div class="ico"><svg viewBox="0 0 24 24"><circle cx="11" cy="11" r="7"/><path d="M21 21l-4.3-4.3"/></svg></div>
+        <h3>Reads text on screen</h3>
+        <p>When a target isn't in the Accessibility tree, it OCRs the screen with the Vision framework and clicks the text directly.</p>
+      </div>
+      <div class="card reveal d1">
+        <div class="ico"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="M2 12h20M12 3a14 14 0 0 1 0 18 14 14 0 0 1 0-18z"/></svg></div>
+        <h3>Live web access</h3>
+        <p>Searches the web and reads pages for current information instead of guessing from stale training data.</p>
+      </div>
+      <div class="card reveal d2">
+        <div class="ico"><svg viewBox="0 0 24 24"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg></div>
+        <h3>Remembers</h3>
+        <p>Keeps durable facts — your preferred apps, project paths, common tasks — in local memory across sessions.</p>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- HOW IT WORKS -->
+<section id="how">
+  <div class="wrap">
+    <div class="section-head reveal">
+      <div class="eyebrow">How it works</div>
+      <h2>From hotkey to done.</h2>
+    </div>
+    <div class="steps">
+      <div class="step reveal">
+        <div class="n">1</div>
+        <div><h3>Summon</h3><p>Press the hotkey (default <code>⌃⌥/</code>) or say the wake word. The orb materializes right at your cursor.</p></div>
+      </div>
+      <div class="step reveal">
+        <div class="n">2</div>
+        <div><h3>Speak</h3><p>Ask for anything — "what's this error", "open my downloads", "search for X and summarize it". It captures the screen if it needs context.</p></div>
+      </div>
+      <div class="step reveal">
+        <div class="n">3</div>
+        <div><h3>It acts</h3><p>It picks the most reliable path — Accessibility click, OCR, AppleScript, a keyboard shortcut — and a halo follows the cursor while it works.</p></div>
+      </div>
+      <div class="step reveal">
+        <div class="n">4</div>
+        <div><h3>It verifies</h3><p>After each action it takes a fresh screenshot and checks the result actually happened before moving on. Then it tells you it's done.</p></div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- CAPABILITIES -->
+<section id="tools">
+  <div class="wrap">
+    <div class="section-head reveal">
+      <div class="eyebrow">Under the hood</div>
+      <h2>The tools it can reach for.</h2>
+      <p class="lead">The model chooses the most direct path for each task. Clicking real UI is preferred over guessing pixels.</p>
+    </div>
+    <div class="tools reveal">
+      <div class="tool"><span class="pip" style="background:var(--violet)"></span><code>click_element</code><span>AXPress, no mouse sim</span></div>
+      <div class="tool"><span class="pip" style="background:var(--pink)"></span><code>click_text</code><span>Vision OCR</span></div>
+      <div class="tool"><span class="pip" style="background:var(--sky)"></span><code>see_screen</code><span>native capture</span></div>
+      <div class="tool"><span class="pip" style="background:var(--mint)"></span><code>batch_actions</code><span>multi-step in one call</span></div>
+      <div class="tool"><span class="pip" style="background:var(--violet)"></span><code>web_search</code><span>+ fetch_url</span></div>
+      <div class="tool"><span class="pip" style="background:var(--pink)"></span><code>run_applescript</code></div>
+      <div class="tool"><span class="pip" style="background:var(--sky)"></span><code>run_shell</code><span>guarded</span></div>
+      <div class="tool"><span class="pip" style="background:var(--mint)"></span><code>type_text</code><span>· hotkey · scroll</span></div>
+      <div class="tool"><span class="pip" style="background:var(--violet)"></span><code>open_url</code></div>
+      <div class="tool"><span class="pip" style="background:var(--pink)"></span><code>remember</code><span>· recall</span></div>
+    </div>
+  </div>
+</section>
+
+<!-- INSTALL -->
+<section id="install">
+  <div class="wrap">
+    <div class="section-head reveal">
+      <div class="eyebrow">Install</div>
+      <h2>Up and running in a minute.</h2>
+      <p class="lead">It's ad-hoc signed (no paid Apple Developer ID), so the installer and Homebrew cask strip the Gatekeeper quarantine for you.</p>
+    </div>
+    <div class="install-grid">
+      <div class="term reveal">
+        <div class="term-bar">
+          <span class="d" style="background:#ff5f57"></span><span class="d" style="background:#febc2e"></span><span class="d" style="background:#28c840"></span>
+          <span class="t">~/cursor-voice — install</span>
+        </div>
+        <div class="term-body">
+          <div class="row">
+            <span class="ln" id="curl-cmd"><span class="pr">$ </span><span class="cm">curl</span> -fsSL https://raw.githubusercontent.com/tottenabderrahmane1-create/cursor-voice/main/install.sh | bash</span>
+            <button class="copy" data-copy="curl -fsSL https://raw.githubusercontent.com/tottenabderrahmane1-create/cursor-voice/main/install.sh | bash">copy</button>
+          </div>
+          <div class="muted">→ downloads the latest release, drops it in /Applications, launches it</div>
+          <div class="muted" style="height:8px"></div>
+          <div class="row">
+            <span class="ln"><span class="pr">$ </span><span class="cm">brew</span> tap tottenabderrahmane1-create/cursor-voice</span>
+            <button class="copy" data-copy="brew tap tottenabderrahmane1-create/cursor-voice">copy</button>
+          </div>
+          <div class="row">
+            <span class="ln"><span class="pr">$ </span><span class="cm">brew</span> install --cask cursor-voice</span>
+            <button class="copy" data-copy="brew install --cask cursor-voice">copy</button>
+          </div>
+        </div>
+      </div>
+      <div class="install-alt">
+        <div class="alt-card reveal d1">
+          <h4>
+            <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="var(--sky)" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3v12m0 0l-4-4m4 4l4-4M4 21h16"/></svg>
+            Download the DMG
+          </h4>
+          <p>Prefer to drag it in yourself? Grab the latest <a href="https://github.com/tottenabderrahmane1-create/cursor-voice/releases/latest" target="_blank" rel="noopener">release DMG</a> and right-click → Open on first launch.</p>
+        </div>
+        <div class="alt-card reveal d2">
+          <h4>
+            <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="var(--mint)" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M21 12a9 9 0 1 1-6.2-8.5"/><path d="M21 4v5h-5"/></svg>
+            Auto-updates
+          </h4>
+          <p>Once it's installed, new versions land through the in-app updater — a banner in Settings, one click to install and relaunch.</p>
+        </div>
+        <div class="alt-card reveal d3">
+          <h4>
+            <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="var(--violet)" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"/><path d="M12 1v6m0 6v6m11-7h-6m-6 0H1"/></svg>
+            Permissions
+          </h4>
+          <p>It asks for Microphone, Screen Recording, and Accessibility — each unlocks one capability. Grant them, then relaunch.</p>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- WORK IN PROGRESS -->
+<section id="wip">
+  <div class="wrap">
+    <div class="wip reveal">
+      <div class="eyebrow" style="color:var(--pink)">Keeping it real</div>
+      <h2>This is an early beta.</h2>
+      <p class="lead">It works, and it's genuinely useful — but it's a project in active development, not a finished product. Here's the honest state of things so you know what you're getting.</p>
+      <div class="wip-list">
+        <div class="wip-item">
+          <span class="ck"><svg viewBox="0 0 24 24" fill="none" stroke="var(--mint)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6L9 17l-5-5"/></svg></span>
+          <p><b>Clicking is good, not perfect.</b> Accessibility-based clicks and OCR land most of the time. Unlabeled icons and pure-canvas UIs can still trip it up.</p>
+        </div>
+        <div class="wip-item">
+          <span class="ck"><svg viewBox="0 0 24 24" fill="none" stroke="var(--mint)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6L9 17l-5-5"/></svg></span>
+          <p><b>Apple Silicon + macOS 14 only.</b> No Intel build, no iOS, no Windows. Built and tested on one machine so far.</p>
+        </div>
+        <div class="wip-item">
+          <span class="ck"><svg viewBox="0 0 24 24" fill="none" stroke="var(--pink)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 9v4m0 4h.01M10.3 3.9 1.8 18a2 2 0 0 0 1.7 3h17a2 2 0 0 0 1.7-3L13.7 3.9a2 2 0 0 0-3.4 0z"/></svg></span>
+          <p><b>It controls your computer.</b> Shell and AppleScript run with your full permissions (destructive commands are blocked). Run it on machines you trust.</p>
+        </div>
+        <div class="wip-item">
+          <span class="ck"><svg viewBox="0 0 24 24" fill="none" stroke="var(--pink)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 9v4m0 4h.01M10.3 3.9 1.8 18a2 2 0 0 0 1.7 3h17a2 2 0 0 0 1.7-3L13.7 3.9a2 2 0 0 0-3.4 0z"/></svg></span>
+          <p><b>Not notarized.</b> No paid Developer ID yet, so Gatekeeper warns on first launch. The installer works around it; you can read every line of the source.</p>
+        </div>
+        <div class="wip-item">
+          <span class="ck"><svg viewBox="0 0 24 24" fill="none" stroke="var(--sky)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2v4m0 12v4m10-10h-4M6 12H2"/></svg></span>
+          <p><b>You bring the API key.</b> It uses your own OpenAI Realtime usage — there's no hosted backend and nothing is billed by this project.</p>
+        </div>
+        <div class="wip-item">
+          <span class="ck"><svg viewBox="0 0 24 24" fill="none" stroke="var(--sky)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2v4m0 12v4m10-10h-4M6 12H2"/></svg></span>
+          <p><b>Feedback wanted.</b> Bugs, rough edges, and ideas are exactly what this stage is for. Open an issue on GitHub.</p>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<footer>
+  <div class="wrap">
+    <div class="foot-grid">
+      <a href="#top" class="brand"><span class="mark"></span> Cursor Voice</a>
+      <div class="foot-links">
+        <a href="https://github.com/tottenabderrahmane1-create/cursor-voice" target="_blank" rel="noopener">Source</a>
+        <a href="https://github.com/tottenabderrahmane1-create/cursor-voice/releases/latest" target="_blank" rel="noopener">Releases</a>
+        <a href="https://github.com/tottenabderrahmane1-create/cursor-voice/issues" target="_blank" rel="noopener">Report an issue</a>
+        <a href="https://github.com/tottenabderrahmane1-create/cursor-voice/blob/main/README.md" target="_blank" rel="noopener">Docs</a>
+      </div>
+    </div>
+    <p class="foot-note">Open source under the MIT license · not affiliated with or endorsed by OpenAI or Apple · built by <a href="https://github.com/tottenabderrahmane1-create" target="_blank" rel="noopener">@tottenabderrahmane1-create</a></p>
+  </div>
+</footer>
+
+<script>
+  // nav shadow on scroll
+  const nav = document.getElementById('nav');
+  const onScroll = () => nav.classList.toggle('scrolled', window.scrollY > 12);
+  window.addEventListener('scroll', onScroll, { passive: true }); onScroll();
+
+  // scroll reveal
+  const reduce = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+  if (!reduce) {
+    const io = new IntersectionObserver((entries) => {
+      entries.forEach(e => { if (e.isIntersecting) { e.target.classList.add('in'); io.unobserve(e.target); } });
+    }, { threshold: 0.12, rootMargin: '0px 0px -40px 0px' });
+    document.querySelectorAll('.reveal').forEach(el => io.observe(el));
+  } else {
+    document.querySelectorAll('.reveal').forEach(el => el.classList.add('in'));
+  }
+
+  // typed transcript loop
+  const typedEl = document.getElementById('typed');
+  if (typedEl && !reduce) {
+    const phrases = [
+      'what does this error mean?',
+      'open my downloads folder',
+      'search for the changelog and summarize it',
+      'click the export button',
+      'play my focus playlist',
+    ];
+    let p = 0, i = 0, deleting = false;
+    function tick() {
+      const cur = phrases[p];
+      typedEl.textContent = cur.slice(0, i);
+      if (!deleting && i < cur.length) { i++; setTimeout(tick, 45 + Math.random()*40); }
+      else if (!deleting && i === cur.length) { deleting = true; setTimeout(tick, 1700); }
+      else if (deleting && i > 0) { i--; setTimeout(tick, 22); }
+      else { deleting = false; p = (p + 1) % phrases.length; setTimeout(tick, 380); }
+    }
+    tick();
+  } else if (typedEl) {
+    typedEl.textContent = 'what does this error mean?';
+  }
+
+  // copy buttons
+  document.querySelectorAll('.copy').forEach(btn => {
+    btn.addEventListener('click', async () => {
+      try {
+        await navigator.clipboard.writeText(btn.dataset.copy);
+        const old = btn.textContent; btn.textContent = 'copied'; btn.classList.add('ok');
+        setTimeout(() => { btn.textContent = old; btn.classList.remove('ok'); }, 1600);
+      } catch (e) { btn.textContent = 'press ⌘C'; }
+    });
+  });
+</script>
+</body>
+</html>
