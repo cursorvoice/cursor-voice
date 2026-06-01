@@ -1,6 +1,6 @@
 cask "cursor-voice" do
-  version "0.1.0"
-  sha256 "3af1b9609d99c3542d5e8e144a68080a50fff191c0107ee0f59580c9e424ebfa"
+  version "0.2.0"
+  sha256 "57305b8bbf0c41cc6ca2cf774467e4c0d699496c04736bff891b7041fe453bed"
 
   url "https://github.com/tottenabderrahmane1-create/cursor-voice/releases/download/v#{version}/CursorVoice-#{version}.dmg"
   name "Cursor Voice"
@@ -17,8 +17,6 @@ cask "cursor-voice" do
 
   app "CursorVoice.app"
 
-  # The app is ad-hoc signed (no paid Developer ID). Remove the quarantine
-  # attribute on install so Gatekeeper doesn't block first launch.
   postflight do
     system_command "/usr/bin/xattr",
                    args: ["-dr", "com.apple.quarantine", "#{appdir}/CursorVoice.app"],
