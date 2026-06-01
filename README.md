@@ -1,5 +1,7 @@
 # Cursor Voice
 
+**→ [cursorvoice landing page & demo](https://tottenabderrahmane1-create.github.io/cursor-voice/)**
+
 A native macOS voice assistant that lives next to your cursor. Press a hotkey, talk to it, and it sees your screen, drives your Mac, and answers back — powered by the OpenAI Realtime API.
 
 ```
