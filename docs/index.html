@@ -102,6 +102,38 @@
   .nav-links .hide-sm { display: inline; }
   @media (max-width: 680px){ .nav-links .hide-sm { display: none; } }
 
+  /* ── global cursor halo (mirrors the app's CursorHalo) ─────────── */
+  .cursor-halo {
+    position: fixed; top: 0; left: 0; z-index: 9999; pointer-events: none;
+    width: 46px; height: 46px; margin: -23px 0 0 -23px; border-radius: 50%;
+    opacity: 0; will-change: transform, opacity;
+    background:
+      radial-gradient(circle, rgba(247,115,199,.0) 38%, rgba(247,115,199,.55) 52%, rgba(140,76,242,.0) 72%);
+    mix-blend-mode: screen;
+    transition: opacity .35s ease;
+  }
+  .cursor-halo .inner {
+    position: absolute; inset: 12px; border-radius: 50%;
+    background: radial-gradient(circle, rgba(102,199,255,.6), transparent 70%);
+    animation: haloBreathe 1.7s ease-in-out infinite;
+  }
+  @keyframes haloBreathe { 0%,100%{ transform: scale(.85); opacity:.8; } 50%{ transform: scale(1.15); opacity:1; } }
+  .cursor-dot {
+    position: fixed; top: 0; left: 0; z-index: 10000; pointer-events: none;
+    width: 6px; height: 6px; margin: -3px 0 0 -3px; border-radius: 50%;
+    background: #fff; box-shadow: 0 0 10px rgba(255,255,255,.9);
+    opacity: 0; will-change: transform; transition: opacity .25s ease;
+  }
+  /* click ripple */
+  .ripple {
+    position: fixed; z-index: 9998; pointer-events: none; border-radius: 50%;
+    width: 14px; height: 14px; margin: -7px 0 0 -7px;
+    border: 1.5px solid rgba(102,199,255,.8);
+    animation: rip .6s var(--ease) forwards;
+  }
+  @keyframes rip { to { transform: scale(6); opacity: 0; } }
+  @media (hover: none) { .cursor-halo, .cursor-dot { display: none; } }
+
   /* ── scroll progress bar ───────────────────────────────────────── */
   .progress {
     position: fixed; top: 0; left: 0; height: 2px; width: 0%; z-index: 200;
@@ -199,6 +231,23 @@
   .transcript .caret { display: inline-block; width: 2px; height: 1.05em; background: var(--mint); margin-left: 2px; vertical-align: -2px; animation: blink 1s steps(2) infinite; }
   @keyframes blink { 50%{ opacity: 0; } }
 
+  /* ── product showcase ──────────────────────────────────────────── */
+  .showcase { position: relative; margin-top: 64px; perspective: 1400px; }
+  .showcase-frame {
+    position: relative; border-radius: 22px; overflow: hidden;
+    border: 1px solid var(--border-2);
+    box-shadow: 0 40px 120px rgba(140,76,242,.28), 0 10px 40px rgba(0,0,0,.6);
+    transform: rotateX(8deg) scale(.97); transform-style: preserve-3d;
+    transition: transform .25s var(--ease);
+    will-change: transform;
+  }
+  .showcase-frame img { display: block; width: 100%; height: auto; }
+  .showcase-glow {
+    position: absolute; inset: -2px; border-radius: 24px; z-index: -1;
+    background: linear-gradient(120deg, var(--violet), var(--pink), var(--sky), var(--mint));
+    filter: blur(40px); opacity: .35; animation: shift 8s ease infinite; background-size: 220% 220%;
+  }
+
   /* ── sections ──────────────────────────────────────────────────── */
   section { padding: 80px 0; position: relative; }
   .eyebrow { font-size: 13px; font-weight: 600; letter-spacing: .08em; text-transform: uppercase; color: var(--sky); margin-bottom: 14px; }
@@ -240,6 +289,22 @@
   .card .ico svg { width: 21px; height: 21px; stroke: var(--fg); fill: none; stroke-width: 1.6; }
   .card h3 { font-size: 17px; font-weight: 600; margin-bottom: 7px; letter-spacing: -.01em; }
   .card p { font-size: 14.5px; color: var(--fg-dim); font-weight: 350; }
+
+  /* sequence strip */
+  .seq { position: relative; margin-bottom: 50px; border-radius: var(--radius); overflow: hidden; border: 1px solid var(--border); }
+  .seq img { display: block; width: 100%; height: auto; }
+  .seq::after {
+    content: ''; position: absolute; inset: 0; pointer-events: none;
+    background: linear-gradient(90deg, rgba(7,7,11,.0) 60%, rgba(7,7,11,.0));
+  }
+  /* scan light that sweeps the sequence on reveal */
+  .seq .scan {
+    position: absolute; top: 0; bottom: 0; width: 36%; left: -40%;
+    background: linear-gradient(90deg, transparent, rgba(255,255,255,.07), transparent);
+    pointer-events: none;
+  }
+  .seq.in .scan { animation: scan 2.2s var(--ease) .3s; }
+  @keyframes scan { to { left: 120%; } }
 
   /* how it works steps */
   .steps { display: grid; gap: 0; }
@@ -347,6 +412,8 @@
 </style>
 </head>
 <body>
+<div class="cursor-halo" id="halo" aria-hidden="true"><span class="inner"></span></div>
+<div class="cursor-dot" id="dot" aria-hidden="true"></div>
 <div class="progress" id="progress" aria-hidden="true"></div>
 <div class="field" aria-hidden="true"></div>
 <div class="grain" aria-hidden="true"></div>
@@ -407,6 +474,14 @@
       </div>
     </div>
     <div class="transcript" aria-hidden="true"><span class="typed" id="typed"></span><span class="caret"></span></div>
+
+    <div class="showcase reveal" id="showcase">
+      <div class="showcase-glow" aria-hidden="true"></div>
+      <div class="showcase-frame" id="showcaseFrame">
+        <img src="assets/hero-shot.jpg" width="1586" height="992"
+             alt="The Cursor Voice orb resting inside a chat input field, with a glowing aurora ring around the mouse pointer." loading="eager" />
+      </div>
+    </div>
   </div>
 </header>
 
@@ -459,6 +534,11 @@
     <div class="section-head reveal">
       <div class="eyebrow">How it works</div>
       <h2>From hotkey to done.</h2>
+    </div>
+    <div class="seq reveal" id="seq" aria-hidden="true">
+      <span class="scan"></span>
+      <img src="assets/sequence.jpg" width="1600" height="800"
+           alt="Three frames: the orb appears by the cursor, then beside a captured screenshot, then with a glowing ring around a clicked control." loading="lazy" />
     </div>
     <div class="steps">
       <div class="step reveal">
@@ -650,6 +730,61 @@
     window.addEventListener('scroll', () => {
       if (field) field.style.transform = `translateY(${window.scrollY * 0.04}px)`;
     }, { passive: true });
+  }
+
+  // global cursor halo — mirrors the app's CursorHalo, with smooth trailing
+  const halo = document.getElementById('halo');
+  const dot  = document.getElementById('dot');
+  if (halo && dot && !reduceMotion && window.matchMedia('(hover: hover)').matches) {
+    let tx = window.innerWidth/2, ty = window.innerHeight/2;   // halo target (lagged)
+    let hx = tx, hy = ty;                                       // halo current
+    let dx = tx, dy = ty;                                       // dot (snappier)
+    let shown = false;
+    window.addEventListener('pointermove', (e) => {
+      tx = e.clientX; ty = e.clientY; dx = e.clientX; dy = e.clientY;
+      if (!shown) { shown = true; halo.style.opacity = '.9'; dot.style.opacity = '1'; }
+    }, { passive: true });
+    document.addEventListener('pointerleave', () => { halo.style.opacity='0'; dot.style.opacity='0'; shown=false; });
+
+    // halo intensifies over interactive elements (echoes "AI is acting")
+    document.addEventListener('pointerover', (e) => {
+      const interactive = e.target.closest('a,button,.card,.tool,.copy');
+      halo.style.transform += '';
+      halo.style.width = interactive ? '64px' : '46px';
+      halo.style.height = interactive ? '64px' : '46px';
+      halo.style.margin = interactive ? '-32px 0 0 -32px' : '-23px 0 0 -23px';
+    });
+
+    const loop = () => {
+      hx += (tx - hx) * 0.18; hy += (ty - hy) * 0.18;          // lag = aurora drift
+      halo.style.transform = `translate3d(${hx}px, ${hy}px, 0)`;
+      dot.style.transform  = `translate3d(${dx}px, ${dy}px, 0)`;
+      requestAnimationFrame(loop);
+    };
+    loop();
+
+    // click ripple
+    window.addEventListener('pointerdown', (e) => {
+      const r = document.createElement('span'); r.className = 'ripple';
+      r.style.left = e.clientX + 'px'; r.style.top = e.clientY + 'px';
+      document.body.appendChild(r);
+      setTimeout(() => r.remove(), 650);
+    });
+  }
+
+  // showcase tilt-to-cursor
+  const frame = document.getElementById('showcaseFrame');
+  if (frame && !reduceMotion) {
+    const showcase = document.getElementById('showcase');
+    showcase.addEventListener('pointermove', (e) => {
+      const r = showcase.getBoundingClientRect();
+      const px = (e.clientX - r.left) / r.width - .5;
+      const py = (e.clientY - r.top) / r.height - .5;
+      frame.style.transform = `rotateX(${8 - py*10}deg) rotateY(${px*10}deg) scale(.99)`;
+    });
+    showcase.addEventListener('pointerleave', () => {
+      frame.style.transform = 'rotateX(8deg) scale(.97)';
+    });
   }
 
   // card cursor spotlight
