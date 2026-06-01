@@ -1,0 +1,145 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Privacy — Cursor Voice</title>
+<meta name="description" content="Privacy policy for the Cursor Voice website and app." />
+<meta name="robots" content="all" />
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet" />
+<style>
+  :root{
+    --violet:#8c4cf2; --pink:#f773c7; --sky:#66c7ff; --mint:#6bf7e5;
+    --bg:#07070b; --surface:rgba(255,255,255,.035); --surface-2:rgba(255,255,255,.06);
+    --border:rgba(255,255,255,.09); --border-2:rgba(255,255,255,.14);
+    --fg:#f4f4f8; --fg-dim:#a4a4b4; --fg-faint:#6c6c7e;
+    --maxw:760px; --ease:cubic-bezier(.22,.61,.36,1);
+  }
+  *{box-sizing:border-box;margin:0;padding:0}
+  html{scroll-behavior:smooth;-webkit-text-size-adjust:100%}
+  body{
+    font-family:'Inter',system-ui,-apple-system,sans-serif;background:var(--bg);color:var(--fg);
+    line-height:1.65;-webkit-font-smoothing:antialiased;
+  }
+  .field{position:fixed;inset:0;z-index:-2;
+    background:radial-gradient(50vw 50vw at 15% -10%,rgba(140,76,242,.16),transparent 60%),
+               radial-gradient(45vw 45vw at 95% 5%,rgba(247,115,199,.10),transparent 60%);}
+  .wrap{max-width:var(--maxw);margin:0 auto;padding:0 24px}
+  nav{position:sticky;top:0;z-index:100;backdrop-filter:blur(18px);background:rgba(7,7,11,.6);border-bottom:1px solid var(--border)}
+  nav .wrap{display:flex;align-items:center;justify-content:space-between;height:64px}
+  .brand{display:flex;align-items:center;gap:11px;font-weight:600;font-size:16px;text-decoration:none;color:var(--fg);letter-spacing:-.01em}
+  .brand .mark{width:24px;height:24px;border-radius:50%;
+    background:conic-gradient(from 0deg,var(--violet),var(--pink),var(--sky),var(--mint),var(--violet));
+    box-shadow:0 0 14px rgba(140,76,242,.55);position:relative}
+  .brand .mark::after{content:'';position:absolute;inset:5px;border-radius:50%;
+    background:radial-gradient(circle at 35% 30%,rgba(255,255,255,.9),transparent 60%)}
+  .back{color:var(--fg-dim);text-decoration:none;font-size:14px;transition:color .2s}
+  .back:hover{color:var(--fg)}
+  main{padding:64px 0 90px}
+  h1{font-size:clamp(32px,6vw,46px);font-weight:700;letter-spacing:-.03em;line-height:1.05;margin-bottom:12px}
+  .updated{font-size:13.5px;color:var(--fg-faint);margin-bottom:38px;font-family:'JetBrains Mono',monospace}
+  h2{font-size:21px;font-weight:600;letter-spacing:-.015em;margin:38px 0 12px;
+     background:linear-gradient(110deg,var(--violet),var(--sky));-webkit-background-clip:text;background-clip:text;color:transparent}
+  p,li{font-size:15.5px;color:var(--fg-dim);font-weight:350;margin-bottom:13px}
+  p b,li b{color:var(--fg);font-weight:550}
+  ul{padding-left:22px;margin-bottom:13px}
+  li{margin-bottom:8px}
+  a{color:var(--sky);text-decoration:none}
+  a:hover{text-decoration:underline}
+  code{font-family:'JetBrains Mono',monospace;font-size:13px;background:var(--surface-2);padding:2px 6px;border-radius:5px;color:var(--mint)}
+  .lead{font-size:17px;color:var(--fg-dim);margin-bottom:30px}
+  .card{background:var(--surface);border:1px solid var(--border);border-radius:14px;padding:20px 22px;margin:18px 0}
+  .card p:last-child{margin-bottom:0}
+  table{width:100%;border-collapse:collapse;margin:14px 0;font-size:14px}
+  th,td{text-align:left;padding:10px 12px;border-bottom:1px solid var(--border)}
+  th{color:var(--fg);font-weight:600;font-size:13px}
+  td{color:var(--fg-dim);font-weight:350}
+  td code{font-size:12px}
+  footer{border-top:1px solid var(--border);padding:34px 0;text-align:center}
+  footer p{font-size:13px;color:var(--fg-faint);margin:0}
+  :focus-visible{outline:2px solid var(--sky);outline-offset:3px;border-radius:4px}
+</style>
+</head>
+<body>
+<div class="field" aria-hidden="true"></div>
+<nav>
+  <div class="wrap">
+    <a class="brand" href="./index.html"><span class="mark"></span> Cursor Voice</a>
+    <a class="back" href="./index.html">← Back to site</a>
+  </div>
+</nav>
+
+<main>
+  <div class="wrap">
+    <h1>Privacy Policy</h1>
+    <p class="updated">Last updated: 1 June 2026</p>
+
+    <p class="lead">Short version: this site uses Google Analytics, and only after you opt in. The Cursor Voice app talks directly to OpenAI with your own key — there's no server in the middle collecting anything. Details below.</p>
+
+    <h2>Who this covers</h2>
+    <p>This policy covers two separate things:</p>
+    <ul>
+      <li><b>This website</b> (<code>tottenabderrahmane1-create.github.io/cursor-voice</code>) — the landing page you're on.</li>
+      <li><b>The Cursor Voice app</b> — the macOS application you can download.</li>
+    </ul>
+    <p>They're treated separately because they handle data very differently.</p>
+
+    <h2>The website</h2>
+    <p>The site is hosted on <b>GitHub Pages</b>. GitHub may log standard server request data (IP address, user agent) as part of serving the page — see the <a href="https://docs.github.com/site-policy/privacy-policies/github-privacy-statement" target="_blank" rel="noopener">GitHub Privacy Statement</a>.</p>
+
+    <p>Beyond that, the only tracking is <b>Google Analytics 4</b>, and it is <b>off by default</b>. Nothing analytics-related loads or runs until you click <b>"Allow analytics"</b> in the consent banner. If you decline, no analytics cookies are set and no events are sent.</p>
+
+    <div class="card">
+      <p><b>What we'd see if you opt in:</b> which sections you scroll to, what you click (install button, GitHub links, which install command you copy), how far down the page you get, and roughly how long you stay. This is aggregate, behavioural data — it helps us know what's working. We do <b>not</b> collect your name, email, or anything you type.</p>
+    </div>
+
+    <h2>Cookies</h2>
+    <p>The site sets cookies only in these cases:</p>
+    <table>
+      <tr><th>Cookie</th><th>Purpose</th><th>Set when</th></tr>
+      <tr><td><code>cv_consent</code></td><td>Remembers your accept/decline choice so you're not asked again (180 days)</td><td>You make a choice</td></tr>
+      <tr><td><code>_ga</code>, <code>_ga_*</code></td><td>Google Analytics — distinguishes visitors and sessions</td><td>Only if you allow analytics</td></tr>
+    </table>
+    <p>You can change your mind anytime via the <b>"cookie settings"</b> link in the site footer, or by clearing cookies in your browser.</p>
+
+    <h2>Google Analytics specifics</h2>
+    <ul>
+      <li>IP anonymization is enabled (<code>anonymize_ip</code>).</li>
+      <li>Google Consent Mode v2 is used — ad/personalization storage is always denied; only analytics storage is enabled, and only after you opt in.</li>
+      <li>Data is processed by Google. See <a href="https://policies.google.com/privacy" target="_blank" rel="noopener">Google's Privacy Policy</a> and <a href="https://support.google.com/analytics/answer/6004245" target="_blank" rel="noopener">how Analytics handles data</a>.</li>
+    </ul>
+
+    <h2>The app</h2>
+    <p>The Cursor Voice macOS app is different — it has <b>no analytics, no telemetry, and no backend run by us</b>. Specifically:</p>
+    <ul>
+      <li>Your <b>OpenAI API key</b> is stored only in your macOS Keychain on your machine.</li>
+      <li>When the orb is active, your <b>voice and screenshots are sent directly to the OpenAI Realtime API</b> over your own account — governed by <a href="https://openai.com/policies/row-privacy-policy/" target="_blank" rel="noopener">OpenAI's privacy policy</a>. Nothing routes through us.</li>
+      <li>The <b>wake word</b> is recognised on-device; audio isn't transmitted until the phrase matches.</li>
+      <li><b>Memory</b> the app saves stays local at <code>~/Library/Application Support/CursorVoice/memory.json</code>.</li>
+      <li>The app checks GitHub for new releases (a normal HTTPS request to the public releases API). No identifying data is attached.</li>
+    </ul>
+
+    <h2>Your choices</h2>
+    <ul>
+      <li><b>Decline analytics</b> — the site works identically.</li>
+      <li><b>Withdraw consent</b> — use "cookie settings" in the footer, or clear cookies.</li>
+      <li><b>Browser controls</b> — Do Not Track and cookie-blocking extensions are respected (blocking GA's domain stops all of it).</li>
+    </ul>
+
+    <h2>Contact</h2>
+    <p>Questions, or want data removed? Open an issue on <a href="https://github.com/tottenabderrahmane1-create/cursor-voice/issues" target="_blank" rel="noopener">GitHub</a>. This is an open-source side project, not a company — but I'll respond.</p>
+
+    <h2>Changes</h2>
+    <p>If this policy changes, the "last updated" date above changes with it. Material changes will be noted in the GitHub repository.</p>
+  </div>
+</main>
+
+<footer>
+  <div class="wrap">
+    <p>Open source under the MIT license · not affiliated with OpenAI or Apple</p>
+  </div>
+</footer>
+</body>
+</html>
