@@ -10,7 +10,6 @@
 <link rel="preconnect" href="https://fonts.googleapis.com" />
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet" />
-<script type="module" src="https://cdn.jsdelivr.net/npm/@google/model-viewer@3.5.0/dist/model-viewer.min.js"></script>
 
 <!-- ── Analytics: Google Analytics 4 with Consent Mode v2 ───────────────
      Replace G-XXXXXXXXXX below with your GA4 Measurement ID
@@ -204,37 +203,30 @@
   .req { font-size: 13px; color: var(--fg-faint); margin-top: 6px; }
 
   /* ── orb ───────────────────────────────────────────────────────── */
-  .orb-stage { position: relative; height: clamp(280px, 40vw, 460px); display: grid; place-items: center; margin-top: 36px; }
-  .orb-wrap { position: relative; width: clamp(190px, 32vw, 300px); aspect-ratio: 1; }
-
-  /* 3D model + aura. z-order: aura (behind) → fallback orb → 3D model (front) */
-  .orb3d { position: absolute; inset: 0; width: 100%; height: 100%; --poster-color: transparent; background: transparent; z-index: 3; }
-  .orb3d::part(default-progress-bar) { display: none; }
-  .aura {
-    position: absolute; inset: -22%; border-radius: 50%; z-index: 0; pointer-events: none;
+  .orb-stage { position: relative; height: clamp(260px, 38vw, 420px); display: grid; place-items: center; margin-top: 36px; }
+  .orb-wrap { position: relative; width: clamp(150px, 26vw, 240px); aspect-ratio: 1; }
+  .orb {
+    position: absolute; inset: 0; border-radius: 50%;
     background:
-      radial-gradient(circle, rgba(247,115,199,.0) 30%, rgba(247,115,199,.42) 46%, rgba(140,76,242,.0) 66%),
-      radial-gradient(circle, rgba(102,199,255,.35), transparent 60%);
-    filter: blur(26px);
-    animation: auraPulse 4.5s ease-in-out infinite;
-  }
-  .aura.a2 { inset: -6%; filter: blur(14px); opacity: .8; animation: auraPulse 6s ease-in-out infinite reverse; }
-  @keyframes auraPulse {
-    0%,100% { transform: scale(.92); opacity: .55; }
-    50%     { transform: scale(1.08); opacity: .9; }
-  }
-  /* loading shimmer before the model paints */
-  .orb-fallback {
-    position: absolute; inset: 14%; border-radius: 50%; z-index: 2;
-    background:
-      radial-gradient(circle at 36% 30%, rgba(255,255,255,.95), rgba(255,255,255,.35) 20%, transparent 46%),
+      radial-gradient(circle at 36% 30%, rgba(255,255,255,.95), rgba(255,255,255,.4) 18%, transparent 42%),
       conic-gradient(from 220deg, var(--violet), var(--pink), var(--sky), var(--mint), var(--violet));
-    filter: saturate(1.2);
-    box-shadow: inset 0 0 40px rgba(255,255,255,.2), 0 0 50px rgba(140,76,242,.4);
-    opacity: 1; animation: spin 14s linear infinite, breathe 4.5s ease-in-out infinite;
-    transition: opacity .6s ease;
+    filter: saturate(1.25);
+    box-shadow:
+      0 0 60px rgba(140,76,242,.55),
+      0 0 120px rgba(247,115,199,.3),
+      inset 0 0 50px rgba(255,255,255,.18);
+    animation: spin 14s linear infinite, breathe 4.5s ease-in-out infinite;
   }
-  .orb-wrap.loaded .orb-fallback { opacity: 0; }
+  .orb::before {
+    content: ''; position: absolute; inset: 14%; border-radius: 50%;
+    background: conic-gradient(from 90deg, var(--mint), var(--sky), var(--violet), var(--pink), var(--mint));
+    filter: blur(14px); opacity: .85; animation: spin 9s linear infinite reverse;
+  }
+  .orb::after {
+    content: ''; position: absolute; inset: 0; border-radius: 50%;
+    box-shadow: inset 0 0 30px 4px rgba(255,255,255,.25);
+  }
+  @keyframes breathe { 0%,100%{ transform: scale(1);} 50%{ transform: scale(1.05);} }
   .ring {
     position: absolute; inset: -10%; border-radius: 50%;
     border: 1px solid rgba(255,255,255,.10);
@@ -523,30 +515,10 @@
     <div class="orb-stage" aria-hidden="true">
       <div class="orb-wrap" id="orbWrap">
         <span class="ring"></span><span class="ring r2"></span><span class="ring r3"></span>
-        <div class="aura"></div>
-        <div class="aura a2"></div>
-        <div class="orb-fallback"></div>
-        <model-viewer
-          class="orb3d" id="orb3d"
-          src="assets/orb.glb?v=3"
-          alt="A glowing iridescent 3D orb"
-          camera-controls
-          auto-rotate
-          auto-rotate-delay="0"
-          rotation-per-second="22deg"
-          interaction-prompt="none"
-          disable-zoom
-          disable-pan
-          camera-orbit="0deg 80deg auto"
-          exposure="1.2"
-          shadow-intensity="0"
-          environment-image="neutral"
-          loading="eager"
-          reveal="auto">
-        </model-viewer>
+        <div class="orb"></div>
         <div class="cursor-hint">
           <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor"><path d="M4 2l16 7-7 2-2 7z"/></svg>
-          drag to spin
+          follows your cursor
         </div>
       </div>
     </div>
@@ -861,20 +833,6 @@
       document.body.appendChild(r);
       setTimeout(() => r.remove(), 650);
     });
-  }
-
-  // 3D orb: fade the fallback once the model paints; respect reduced-motion
-  const orb3d = document.getElementById('orb3d');
-  const orbWrap = document.getElementById('orbWrap');
-  if (orb3d) {
-    if (reduceMotion) orb3d.removeAttribute('auto-rotate');
-    // Only hide the gradient fallback once the real 3D model has actually
-    // painted. If model-viewer fails to load or decode, the gradient orb
-    // stays — so there's never an empty hole in the hero.
-    orb3d.addEventListener('load', () => { orbWrap && orbWrap.classList.add('loaded'); });
-    orb3d.addEventListener('error', (e) => { console.warn('[orb] model failed, keeping fallback', e?.detail || e); });
-  } else {
-    console.warn('[orb] <model-viewer> not defined — library did not load; using gradient fallback');
   }
 
   // showcase tilt-to-cursor
