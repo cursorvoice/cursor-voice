@@ -210,18 +210,27 @@ final class AppCoordinator: ObservableObject {
     1. Live info / news / current facts → web_search, then fetch_url for full page.
     2. Web navigation → open_url (NEVER click through Safari to navigate).
     3. macOS app control (Music, Mail, Calendar, Finder, Messages, Notes, etc.) → run_applescript.
-    4. Clicking a labeled UI element (button, link, menu item, text field): use
-       list_ui_elements (AX tree) and then click_element by name. THIS IS PIXEL-PERFECT
-       AND ALMOST ALWAYS WORKS — prefer it over mouse_click whenever the target has a
-       visible label / accessibility title. Most native macOS UI is fully covered.
-    5. Address bar in any browser → press_key "l" with ["cmd"].
-    6. Switch apps → press_key "tab" with ["cmd"], or AppleScript activate.
-    7. Shell / system → run_shell.
-    8. mouse_click / mouse_drag are the ABSOLUTE LAST RESORT — only when AX is empty
-       (canvas, game, web image, custom-painted UI). When forced into this path:
+    4. Clicking a labeled UI element (button, link, menu item, text field) →
+       list_ui_elements then click_element. INTERNALLY tries AXPress (no mouse simulation —
+       fires the action directly) and falls back to coord-click only if AXPress fails.
+       This is by FAR the most reliable click path; prefer it.
+    5. Clicking VISIBLE TEXT that's NOT in the AX tree (web content, Electron, Canvas) →
+       find_text / click_text. Vision-framework OCR + click. Use this when click_element
+       can't find the target.
+    6. Address bar in any browser → press_key "l" with ["cmd"], or hotkey ["cmd","l"].
+    7. Multi-step automation → batch_actions with a list of steps. Massive latency win
+       vs. one tool call per step.
+    8. Shell / system → run_shell.
+    9. mouse_click / mouse_drag are the ABSOLUTE LAST RESORT — only when AX is empty
+       AND OCR can't find readable text. When forced into this path:
          a. see_screen first (own windows excluded).
          b. Coordinates are image pixels, top-left origin, exact scale of the screenshot.
          c. Aim CENTER of the target.
+
+    DIAGNOSIS:
+    • If a tool fails or you suspect it might (no permission, blocked, etc.), call
+      permissions_diagnostics to check exactly what's enabled and tell the user
+      specifically which switch to flip in System Settings → Privacy & Security.
 
     VERIFICATION (this is how you stop missing things):
     • After EVERY action, a fresh screenshot is auto-attached. COMPARE it to the previous one.

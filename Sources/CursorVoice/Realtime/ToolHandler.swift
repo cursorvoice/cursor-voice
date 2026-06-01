@@ -1,6 +1,9 @@
 import Foundation
 import CoreGraphics
 import AppKit
+import AVFoundation
+import Speech
+import ApplicationServices
 
 /// Output of a tool call. `outputJSON` is the string the model receives as
 /// the function call result. `attachedImageBase64`, if set, is a JPEG that
@@ -28,15 +31,79 @@ actor ToolHandler {
         [
             "type": "function",
             "name": "click_element",
-            "description": "Click a UI element identified by its title text (and optionally its role like AXButton, AXLink, AXTextField). The element's center is clicked via the Accessibility tree — accurate down to the pixel and immune to layout shifts. Use this instead of mouse_click whenever the target has an accessible label. Call list_ui_elements first if you're not sure of the exact title.",
+            "description": "Click a UI element by its title text (and optional role). FIRST tries to fire the element's AXPress action directly — no mouse simulation, immune to scaling/scroll/animation. Falls back to clicking the element's frame center if AXPress isn't supported. This is the MOST RELIABLE way to click — prefer it over mouse_click for anything with a visible label.",
             "parameters": [
                 "type": "object",
                 "properties": [
                     "name": ["type": "string", "description": "Title/label of the element. Case-insensitive substring match."],
                     "role": ["type": "string", "description": "Optional AX role filter (AXButton, AXLink, AXTextField, AXMenuItem, AXCheckBox, ...)"],
-                    "count": ["type": "integer", "default": 1, "description": "1 for single, 2 for double-click"]
+                    "count": ["type": "integer", "default": 1, "description": "1 for single, 2 for double-click (fallback path only)"]
                 ],
                 "required": ["name"]
+            ]
+        ],
+        [
+            "type": "function",
+            "name": "find_text",
+            "description": "Take a screenshot and OCR it with the macOS Vision framework. Returns text matches with their pixel bounding boxes. Use this when the target is visible text that's NOT exposed via the Accessibility tree (web content in Safari, Electron apps, Canvas, dynamically-painted UI). Provide a query to filter results.",
+            "parameters": [
+                "type": "object",
+                "properties": [
+                    "query": ["type": "string", "description": "Optional substring to filter recognised text."]
+                ],
+                "required": [] as [String]
+            ]
+        ],
+        [
+            "type": "function",
+            "name": "click_text",
+            "description": "Find visible text on screen via OCR, then click the center of the matched box. Use this when click_element fails and there's visible text to target — works on web pages, images, anything Vision can read. Returns success + the matched text.",
+            "parameters": [
+                "type": "object",
+                "properties": [
+                    "query": ["type": "string", "description": "The visible text to find and click. Case-insensitive substring."],
+                    "match_index": ["type": "integer", "default": 0, "description": "If multiple matches, which one to click (0 = first)."]
+                ],
+                "required": ["query"]
+            ]
+        ],
+        [
+            "type": "function",
+            "name": "hotkey",
+            "description": "Press a key combo expressed as a list, e.g. [\"cmd\",\"shift\",\"t\"]. Modifiers can be anywhere in the list; the last non-modifier is the actual key. Use this for chord shortcuts.",
+            "parameters": [
+                "type": "object",
+                "properties": [
+                    "keys": ["type": "array", "items": ["type": "string"]]
+                ],
+                "required": ["keys"]
+            ]
+        ],
+        [
+            "type": "function",
+            "name": "permissions_diagnostics",
+            "description": "Report current macOS permission state for Microphone, Speech Recognition, Screen Recording, and Accessibility. Call this when a tool fails so you can tell the user concretely what they need to enable.",
+            "parameters": [
+                "type": "object",
+                "properties": [:] as [String: Any],
+                "required": [] as [String]
+            ]
+        ],
+        [
+            "type": "function",
+            "name": "batch_actions",
+            "description": "Run a sequence of input actions in ONE tool call (without taking a screenshot between each step). Use this for any multi-step automation to massively cut round-trip latency. One screenshot is auto-attached after the whole batch finishes. Supported action types: click_element, mouse_click, type_text, press_key, hotkey, scroll, sleep.",
+            "parameters": [
+                "type": "object",
+                "properties": [
+                    "actions": [
+                        "type": "array",
+                        "description": "Ordered list of action dicts. Each must have a 'type' field plus that type's normal arguments.",
+                        "items": ["type": "object"]
+                    ],
+                    "stop_on_error": ["type": "boolean", "default": true]
+                ],
+                "required": ["actions"]
             ]
         ],
         [
@@ -232,23 +299,28 @@ actor ToolHandler {
 
     private func friendlyLabel(for tool: String) -> String {
         switch tool {
-        case "see_screen":       return "looking at screen"
-        case "list_ui_elements": return "reading UI tree"
-        case "click_element":    return "clicking"
-        case "remember":         return "remembering"
-        case "recall":           return "recalling"
-        case "web_search":       return "searching the web"
-        case "fetch_url":        return "reading a page"
-        case "open_url":         return "opening a link"
-        case "mouse_move":       return "moving cursor"
-        case "mouse_click":      return "clicking"
-        case "mouse_drag":       return "dragging"
-        case "scroll":           return "scrolling"
-        case "type_text":        return "typing"
-        case "press_key":        return "pressing key"
-        case "run_applescript":  return "running script"
-        case "run_shell":        return "running command"
-        default:                 return tool
+        case "see_screen":               return "looking at screen"
+        case "list_ui_elements":         return "reading UI tree"
+        case "click_element":            return "clicking"
+        case "find_text":                return "reading text on screen"
+        case "click_text":               return "clicking on text"
+        case "remember":                 return "remembering"
+        case "recall":                   return "recalling"
+        case "web_search":               return "searching the web"
+        case "fetch_url":                return "reading a page"
+        case "open_url":                 return "opening a link"
+        case "mouse_move":               return "moving cursor"
+        case "mouse_click":              return "clicking"
+        case "mouse_drag":               return "dragging"
+        case "scroll":                   return "scrolling"
+        case "type_text":                return "typing"
+        case "press_key":                return "pressing key"
+        case "hotkey":                   return "pressing keys"
+        case "permissions_diagnostics":  return "checking permissions"
+        case "batch_actions":            return "running steps"
+        case "run_applescript":          return "running script"
+        case "run_shell":                return "running command"
+        default:                         return tool
         }
     }
 
@@ -298,14 +370,125 @@ actor ToolHandler {
                 )
             }
             self.inputActivity?(true)
-            let center = CGPoint(x: match.frame.midX, y: match.frame.midY)
-            InputSynth.clickPoint(center, count: count)
+            // Try AXPress first — no mouse simulation, no coordinate math.
+            // Only do the AXPress path for single clicks; double-click needs a real click.
+            let pressed = (count == 1) && AXTree.tryPress(match.element)
+            if !pressed {
+                let center = CGPoint(x: match.frame.midX, y: match.frame.midY)
+                InputSynth.clickPoint(center, count: count)
+            }
             try? await Task.sleep(nanoseconds: 250_000_000)
             self.inputActivity?(false)
             return await confirmWithScreenshot([
                 "ok": true,
                 "action": "click_element",
+                "via": pressed ? "AXPress" : "coordinate",
                 "clicked": ["role": match.role, "title": match.title]
+            ])
+
+        case "find_text":
+            let q = args["query"] as? String
+            NSLog("Tool: find_text query=\(q ?? "—")")
+            let shot = await ScreenCapture.shared.capture()
+            guard let cg = shot.cgImage else {
+                return ToolDispatchResult(outputJSON: encode(["error": "screen capture failed"]),
+                                          attachedImageBase64: nil)
+            }
+            let matches = OCR.filter(await OCR.recognize(in: cg), query: q)
+            let payload = matches.prefix(40).map { m in
+                [
+                    "text": m.text,
+                    "bbox": [
+                        "x": Int(m.bbox.origin.x),
+                        "y": Int(m.bbox.origin.y),
+                        "w": Int(m.bbox.size.width),
+                        "h": Int(m.bbox.size.height)
+                    ],
+                    "confidence": Double(m.confidence)
+                ] as [String: Any]
+            }
+            return ToolDispatchResult(
+                outputJSON: encode(["count": matches.count, "matches": payload]),
+                attachedImageBase64: shot.imageBase64
+            )
+
+        case "click_text":
+            let q = (args["query"] as? String) ?? ""
+            let idx = (args["match_index"] as? Int) ?? 0
+            NSLog("Tool: click_text query=\"\(q)\" idx=\(idx)")
+            let shot = await ScreenCapture.shared.capture()
+            guard let cg = shot.cgImage else {
+                return ToolDispatchResult(outputJSON: encode(["error": "screen capture failed"]),
+                                          attachedImageBase64: nil)
+            }
+            let matches = OCR.filter(await OCR.recognize(in: cg), query: q)
+            guard !matches.isEmpty, idx >= 0, idx < matches.count else {
+                return ToolDispatchResult(
+                    outputJSON: encode([
+                        "error": "no text matching \"\(q)\"",
+                        "ocr_count": matches.count
+                    ]),
+                    attachedImageBase64: shot.imageBase64
+                )
+            }
+            let m = matches[idx]
+            let center = CGPoint(x: m.bbox.midX, y: m.bbox.midY)
+            self.inputActivity?(true)
+            InputSynth.click(imagePx: center, button: .left, count: 1)
+            try? await Task.sleep(nanoseconds: 250_000_000)
+            self.inputActivity?(false)
+            return await confirmWithScreenshot([
+                "ok": true,
+                "action": "click_text",
+                "matched_text": m.text
+            ])
+
+        case "hotkey":
+            let keys = (args["keys"] as? [String]) ?? []
+            NSLog("Tool: hotkey \(keys.joined(separator: "+"))")
+            let modSet: Set<String> = ["cmd","command","shift","option","alt","control","ctrl"]
+            let mods = keys.filter { modSet.contains($0.lowercased()) }
+            let mainKey = keys.last { !modSet.contains($0.lowercased()) } ?? ""
+            guard !mainKey.isEmpty else {
+                return ToolDispatchResult(outputJSON: encode(["error": "no main key in \(keys)"]),
+                                          attachedImageBase64: nil)
+            }
+            InputSynth.pressKey(mainKey, modifiers: mods)
+            return await confirmWithScreenshot(["ok": true, "action": "hotkey", "keys": keys])
+
+        case "permissions_diagnostics":
+            return ToolDispatchResult(
+                outputJSON: encode([
+                    "microphone":          Self.authStatusString(AVCaptureDevice.authorizationStatus(for: .audio).rawValue),
+                    "speech_recognition":  Self.authStatusString(Int(SFSpeechRecognizer.authorizationStatus().rawValue)),
+                    "screen_recording":    CGPreflightScreenCaptureAccess() ? "authorized" : "not_authorized",
+                    "accessibility":       AXIsProcessTrusted() ? "authorized" : "not_authorized"
+                ]),
+                attachedImageBase64: nil
+            )
+
+        case "batch_actions":
+            let steps = (args["actions"] as? [[String: Any]]) ?? []
+            let stopOnError = (args["stop_on_error"] as? Bool) ?? true
+            NSLog("Tool: batch_actions ×\(steps.count) stopOnError=\(stopOnError)")
+            self.inputActivity?(true)
+            var done: [[String: Any]] = []
+            var errored = false
+            for step in steps {
+                let stepType = (step["type"] as? String) ?? ""
+                let stepResult = await runBatchStep(type: stepType, args: step)
+                done.append(["type": stepType, "result": stepResult])
+                if let r = stepResult as? [String: Any], r["error"] != nil {
+                    errored = true
+                    if stopOnError { break }
+                }
+            }
+            self.inputActivity?(false)
+            return await confirmWithScreenshot([
+                "ok": !errored,
+                "action": "batch_actions",
+                "steps_run": done.count,
+                "results": done
             ])
 
         case "remember":
@@ -400,7 +583,13 @@ actor ToolHandler {
             let text = (args["text"] as? String) ?? ""
             NSLog("Tool: type_text \(text.count) chars")
             self.inputActivity?(true)
-            InputSynth.type(text)
+            // Long strings: paste via clipboard (~50ms instead of ~5s of CGEvent loop).
+            // Short strings: per-character — more compatible with paste-filtering fields.
+            if text.count > 30 {
+                await pasteText(text)
+            } else {
+                InputSynth.type(text)
+            }
             self.inputActivity?(false)
             return await confirmWithScreenshot(["ok": true, "action": "type_text"])
 
@@ -455,5 +644,93 @@ actor ToolHandler {
         if let data = try? JSONSerialization.data(withJSONObject: obj),
            let s = String(data: data, encoding: .utf8) { return s }
         return "{}"
+    }
+
+    /// Run one step of a batch_actions call. Returns a plain dict that gets
+    /// folded into the batch result. Does NOT take a screenshot per step.
+    private func runBatchStep(type: String, args: [String: Any]) async -> Any {
+        switch type {
+        case "click_element":
+            let nameArg = (args["name"] as? String) ?? ""
+            let roleArg = args["role"] as? String
+            let elements = AXTree.enumerateFrontmost()
+            guard let match = AXTree.bestMatch(in: elements, name: nameArg, role: roleArg) else {
+                return ["error": "no element matching \"\(nameArg)\""]
+            }
+            let pressed = AXTree.tryPress(match.element)
+            if !pressed {
+                InputSynth.clickPoint(CGPoint(x: match.frame.midX, y: match.frame.midY))
+            }
+            return ["ok": true, "via": pressed ? "AXPress" : "coordinate",
+                    "clicked": match.title]
+        case "mouse_click":
+            let x = number(args["x"]) ?? 0
+            let y = number(args["y"]) ?? 0
+            let buttonStr = (args["button"] as? String) ?? "left"
+            let button: CGMouseButton = (buttonStr == "right") ? .right : .left
+            let count = (args["count"] as? Int) ?? 1
+            InputSynth.click(imagePx: CGPoint(x: x, y: y), button: button, count: count)
+            return ["ok": true]
+        case "mouse_move":
+            let x = number(args["x"]) ?? 0
+            let y = number(args["y"]) ?? 0
+            InputSynth.moveCursor(imagePx: CGPoint(x: x, y: y))
+            return ["ok": true]
+        case "type_text":
+            let text = (args["text"] as? String) ?? ""
+            if text.count > 30 { await pasteText(text) } else { InputSynth.type(text) }
+            return ["ok": true]
+        case "press_key":
+            let key = (args["key"] as? String) ?? ""
+            let mods = (args["modifiers"] as? [String]) ?? []
+            InputSynth.pressKey(key, modifiers: mods)
+            return ["ok": true]
+        case "hotkey":
+            let keys = (args["keys"] as? [String]) ?? []
+            let modSet: Set<String> = ["cmd","command","shift","option","alt","control","ctrl"]
+            let mods = keys.filter { modSet.contains($0.lowercased()) }
+            let mainKey = keys.last { !modSet.contains($0.lowercased()) } ?? ""
+            if mainKey.isEmpty { return ["error": "no main key"] }
+            InputSynth.pressKey(mainKey, modifiers: mods)
+            return ["ok": true]
+        case "scroll":
+            let dx = Int32((args["delta_x"] as? Int) ?? 0)
+            let dy = Int32((args["delta_y"] as? Int) ?? 0)
+            InputSynth.scroll(deltaX: dx, deltaY: dy)
+            return ["ok": true]
+        case "sleep":
+            let seconds = number(args["seconds"]) ?? 0
+            try? await Task.sleep(nanoseconds: UInt64(seconds * 1_000_000_000))
+            return ["ok": true]
+        default:
+            return ["error": "unsupported batch action \"\(type)\""]
+        }
+    }
+
+    /// Clipboard-based paste for fast bulk text entry. Stashes the existing
+    /// pasteboard, writes the text, sends Cmd+V, then restores.
+    private func pasteText(_ text: String) async {
+        let pb = NSPasteboard.general
+        let saved = await MainActor.run { pb.string(forType: .string) }
+        await MainActor.run {
+            pb.clearContents()
+            pb.setString(text, forType: .string)
+        }
+        InputSynth.pressKey("v", modifiers: ["cmd"])
+        try? await Task.sleep(nanoseconds: 250_000_000)
+        await MainActor.run {
+            pb.clearContents()
+            if let s = saved { pb.setString(s, forType: .string) }
+        }
+    }
+
+    private static func authStatusString(_ raw: Int) -> String {
+        switch raw {
+        case 0: return "not_determined"
+        case 1: return "restricted"
+        case 2: return "denied"
+        case 3: return "authorized"
+        default: return "unknown(\(raw))"
+        }
     }
 }

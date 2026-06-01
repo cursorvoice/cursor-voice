@@ -21,6 +21,9 @@ final class ScreenCapture {
     struct Result {
         let metadata: [String: String]
         let imageBase64: String?
+        /// The raw CGImage — kept around so OCR / Vision pipelines can run on
+        /// it without re-decoding the JPEG.
+        let cgImage: CGImage?
     }
 
     func capture() async -> Result {
@@ -31,7 +34,7 @@ final class ScreenCapture {
                                                                                 onScreenWindowsOnly: true)
             guard let display = pickDisplay(content: content) else {
                 return Result(metadata: ["error": "no display found", "frontmost": frontmost],
-                              imageBase64: nil)
+                              imageBase64: nil, cgImage: nil)
             }
 
             let cfg = SCStreamConfiguration()
@@ -54,7 +57,7 @@ final class ScreenCapture {
 
             guard let jpeg = jpegEncode(cg, quality: 0.72) else {
                 return Result(metadata: ["error": "jpeg encode failed", "frontmost": frontmost],
-                              imageBase64: nil)
+                              imageBase64: nil, cgImage: cg)
             }
             let b64 = jpeg.base64EncodedString()
 
@@ -73,13 +76,15 @@ final class ScreenCapture {
                     "image_size_px": "\(cfg.width)x\(cfg.height)",
                     "note": "Click coordinates are image pixels, origin TOP-LEFT, matching this screenshot exactly."
                 ],
-                imageBase64: b64
+                imageBase64: b64,
+                cgImage: cg
             )
         } catch {
             NSLog("ScreenCapture: failed: \(error.localizedDescription)")
             return Result(
                 metadata: ["error": error.localizedDescription, "frontmost": frontmost],
-                imageBase64: nil
+                imageBase64: nil,
+                cgImage: nil
             )
         }
     }

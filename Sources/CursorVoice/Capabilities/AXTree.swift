@@ -11,8 +11,18 @@ enum AXTree {
         let role: String
         let title: String
         let value: String
-        let frame: CGRect       // in screen points, top-left origin
-        let identifier: String  // synthetic id stable for a single tree walk
+        let frame: CGRect        // screen points, top-left origin
+        let identifier: String   // synthetic id stable for a single tree walk
+        let element: AXUIElement // live handle for AXPress / other actions
+    }
+
+    /// Try to fire the element's AXPress action. Returns true on success.
+    /// AXPress invokes the action without simulating a click — no coordinate
+    /// math, no cursor movement. Works on every standard AXButton /
+    /// AXMenuItem / AXCheckBox / AXLink etc. The single biggest accuracy win
+    /// available — coordinate clicks should be a fallback only.
+    static func tryPress(_ element: AXUIElement) -> Bool {
+        AXUIElementPerformAction(element, kAXPressAction as CFString) == .success
     }
 
     private static let interestingRoles: Set<String> = [
@@ -110,7 +120,8 @@ enum AXTree {
                     title: displayTitle,
                     value: value,
                     frame: frame,
-                    identifier: "el\(counter)"
+                    identifier: "el\(counter)",
+                    element: element
                 ))
             }
         }
