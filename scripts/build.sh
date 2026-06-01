@@ -1,6 +1,10 @@
 #!/usr/bin/env bash
 # Reproducible build of CursorVoice.app from a fresh checkout.
 # Uses swiftc + iconutil + codesign — no Xcode required (just CLT).
+#
+# Builds into /tmp to avoid iCloud Drive xattrs that break hardened
+# runtime signing. The final .app + .dmg are copied back into $ROOT/build/
+# for convenience.
 set -euo pipefail
 
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
@@ -11,15 +15,17 @@ VERSION="${VERSION:-0.1.0}"
 BUILD_NUMBER="${BUILD_NUMBER:-1}"
 DEPLOY_TARGET="14.0"
 
-BUILD_DIR="$ROOT/build"
-APP_BUNDLE="$BUILD_DIR/$APP_NAME.app"
-ICONSET="$BUILD_DIR/AppIcon.iconset"
+# Build outside iCloud-managed folders.
+WORK_DIR="/tmp/cursorvoice-build"
+APP_BUNDLE="$WORK_DIR/$APP_NAME.app"
+ICONSET="$WORK_DIR/AppIcon.iconset"
 ICON_SRC="$ROOT/Sources/CursorVoice/Assets.xcassets/AppIcon.appiconset"
 ENTITLEMENTS="$ROOT/entitlements.plist"
+OUTPUT_DIR="$ROOT/build"
 
 echo "==> Clean"
-rm -rf "$BUILD_DIR"
-mkdir -p "$APP_BUNDLE/Contents/MacOS" "$APP_BUNDLE/Contents/Resources"
+rm -rf "$WORK_DIR" "$OUTPUT_DIR"
+mkdir -p "$APP_BUNDLE/Contents/MacOS" "$APP_BUNDLE/Contents/Resources" "$OUTPUT_DIR"
 
 echo "==> Compile Swift sources"
 SDK="$(xcrun --show-sdk-path --sdk macosx)"
@@ -79,6 +85,9 @@ cat > "$APP_BUNDLE/Contents/Info.plist" <<EOF
 </plist>
 EOF
 
+echo "==> Strip extended attributes"
+/usr/bin/xattr -cr "$APP_BUNDLE"
+
 echo "==> Code sign (ad-hoc, hardened runtime)"
 codesign --force --deep --sign - \
   --options runtime \
@@ -89,6 +98,10 @@ codesign --force --deep --sign - \
 echo "==> Verify"
 codesign --verify --verbose=2 "$APP_BUNDLE"
 
+echo "==> Copy to $OUTPUT_DIR (for convenience)"
+ditto --noextattr --noqtn "$APP_BUNDLE" "$OUTPUT_DIR/$APP_NAME.app"
+
 echo
-echo "Built: $APP_BUNDLE"
+echo "Built: $APP_BUNDLE  ($VERSION)"
 du -sh "$APP_BUNDLE"
+echo "Mirror: $OUTPUT_DIR/$APP_NAME.app"

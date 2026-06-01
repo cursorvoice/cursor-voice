@@ -11,6 +11,10 @@ struct CursorVoiceApp: App {
             Divider()
             SettingsLink { Text("Settings…") }
                 .keyboardShortcut(",")
+            Button("Check for Updates…") {
+                Task { await UpdateChecker.shared.check() }
+                NSApp.sendAction(Selector(("showSettingsWindow:")), to: nil, from: nil)
+            }
             Divider()
             Button("Quit Cursor Voice") { NSApp.terminate(nil) }
                 .keyboardShortcut("q")
@@ -37,6 +41,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate, ObservableObject {
         // Trigger system permission prompts up front so they never appear
         // mid-conversation. Non-blocking — features degrade if declined.
         Task { @MainActor in await PermissionsOnboarding.requestAll() }
+        // Check for updates on launch and periodically thereafter.
+        UpdateChecker.shared.startPeriodicCheck()
     }
 
     func applicationWillTerminate(_ notification: Notification) {

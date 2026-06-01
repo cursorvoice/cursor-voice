@@ -3,14 +3,19 @@ import SwiftUI
 struct SettingsView: View {
     @EnvironmentObject var settings: SettingsStore
     @EnvironmentObject var coordinator: AppCoordinator
+    @ObservedObject private var updates = UpdateChecker.shared
 
     var body: some View {
-        TabView {
-            GeneralTab().tabItem { Label("General", systemImage: "gearshape") }
-            PermissionsView().tabItem { Label("Permissions", systemImage: "lock.shield") }
-            AdvancedTab().tabItem { Label("Advanced", systemImage: "slider.horizontal.3") }
+        VStack(spacing: 0) {
+            UpdateBanner(checker: updates)
+
+            TabView {
+                GeneralTab().tabItem { Label("General", systemImage: "gearshape") }
+                PermissionsView().tabItem { Label("Permissions", systemImage: "lock.shield") }
+                AdvancedTab().tabItem { Label("Advanced", systemImage: "slider.horizontal.3") }
+            }
         }
-        .frame(width: 500, height: 420)
+        .frame(width: 500, height: 460)
     }
 }
 
