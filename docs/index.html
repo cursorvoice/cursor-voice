@@ -102,22 +102,25 @@
   .nav-links .hide-sm { display: inline; }
   @media (max-width: 680px){ .nav-links .hide-sm { display: none; } }
 
-  /* ── hero ──────────────────────────────────────────────────────── */
-  header { position: relative; padding: 86px 0 70px; text-align: center; }
-  .beta {
-    display: inline-flex; align-items: center; gap: 8px;
-    padding: 6px 13px; border-radius: 999px;
-    font-size: 12.5px; font-weight: 500; letter-spacing: .01em; color: var(--mint);
-    background: rgba(107,247,229,.07); border: 1px solid rgba(107,247,229,.22);
-    margin-bottom: 30px;
+  /* ── scroll progress bar ───────────────────────────────────────── */
+  .progress {
+    position: fixed; top: 0; left: 0; height: 2px; width: 0%; z-index: 200;
+    background: linear-gradient(90deg, var(--violet), var(--pink), var(--sky), var(--mint));
+    box-shadow: 0 0 10px rgba(140,76,242,.7);
+    transition: width .1s linear;
   }
-  .beta .dot { width: 7px; height: 7px; border-radius: 50%; background: var(--mint); box-shadow: 0 0 8px var(--mint); animation: pulse 2s ease-in-out infinite; }
-  @keyframes pulse { 0%,100%{ opacity: 1; transform: scale(1);} 50%{ opacity: .4; transform: scale(.8);} }
+
+  /* ── hero ──────────────────────────────────────────────────────── */
+  header { position: relative; padding: 96px 0 70px; text-align: center; }
 
   h1 {
     font-size: clamp(40px, 7.5vw, 78px); line-height: 1.02; font-weight: 700;
     letter-spacing: -.035em; margin-bottom: 22px;
   }
+  /* word-by-word entrance */
+  h1 .w { display: inline-block; opacity: 0; transform: translateY(24px) rotate(2deg); filter: blur(6px);
+          animation: wordIn .7s var(--ease) forwards; }
+  @keyframes wordIn { to { opacity: 1; transform: none; filter: blur(0); } }
   h1 .grad {
     background: linear-gradient(110deg, var(--violet), var(--pink) 38%, var(--sky) 70%, var(--mint));
     background-size: 220% 100%;
@@ -221,6 +224,14 @@
     opacity: 0; transition: opacity .3s;
   }
   .card:hover { transform: translateY(-4px); background: var(--surface-2); border-color: var(--border-2); }
+  /* cursor-tracking spotlight on cards */
+  .card .spot {
+    position: absolute; width: 320px; height: 320px; border-radius: 50%; pointer-events: none;
+    left: var(--mx,50%); top: var(--my,50%); transform: translate(-50%,-50%);
+    background: radial-gradient(circle, rgba(140,76,242,.16), transparent 65%);
+    opacity: 0; transition: opacity .3s;
+  }
+  .card:hover .spot { opacity: 1; }
   .card .ico {
     width: 42px; height: 42px; border-radius: 11px; display: grid; place-items: center;
     background: linear-gradient(135deg, rgba(140,76,242,.18), rgba(102,199,255,.14));
@@ -256,6 +267,8 @@
     transition: transform .2s var(--ease), border-color .2s, background .2s;
   }
   .tool:hover { transform: translateY(-2px); border-color: var(--border-2); background: var(--surface-2); }
+  .tools .tool { opacity: 0; transform: translateY(16px) scale(.96); transition: opacity .5s var(--ease), transform .5s var(--ease); }
+  .tools.in .tool { opacity: 1; transform: none; }
   .tool .pip { width: 8px; height: 8px; border-radius: 50%; }
   .tool code { font-family: 'JetBrains Mono', monospace; font-size: 12.5px; color: var(--fg); }
   .tool span { color: var(--fg-dim); font-size: 13px; }
@@ -325,6 +338,8 @@
   @media (prefers-reduced-motion: reduce) {
     *, *::before, *::after { animation: none !important; transition: none !important; }
     .reveal { opacity: 1; transform: none; }
+    h1 .w { opacity: 1 !important; transform: none !important; filter: none !important; }
+    .tools .tool { opacity: 1 !important; transform: none !important; }
     html { scroll-behavior: auto; }
   }
 
@@ -332,6 +347,7 @@
 </style>
 </head>
 <body>
+<div class="progress" id="progress" aria-hidden="true"></div>
 <div class="field" aria-hidden="true"></div>
 <div class="grain" aria-hidden="true"></div>
 
@@ -353,8 +369,20 @@
 <a id="top"></a>
 <header>
   <div class="wrap">
-    <div class="beta"><span class="dot"></span> Early beta · work in progress · open source</div>
-    <h1>Talk to your Mac.<br><span class="grad">It sees, and does the thing.</span></h1>
+    <h1 id="hero-h1">
+      <span class="w" style="animation-delay:.05s">Talk</span>
+      <span class="w" style="animation-delay:.12s">to</span>
+      <span class="w" style="animation-delay:.19s">your</span>
+      <span class="w" style="animation-delay:.26s">Mac.</span><br>
+      <span class="grad">
+        <span class="w" style="animation-delay:.36s">It</span>
+        <span class="w" style="animation-delay:.43s">sees,</span>
+        <span class="w" style="animation-delay:.5s">and</span>
+        <span class="w" style="animation-delay:.57s">does</span>
+        <span class="w" style="animation-delay:.64s">the</span>
+        <span class="w" style="animation-delay:.71s">thing.</span>
+      </span>
+    </h1>
     <p class="sub">A native macOS assistant that lives next to your cursor. Press a hotkey, speak, and it <b>reads your screen</b>, <b>clicks and types for you</b>, and answers back in voice — powered by the OpenAI Realtime API.</p>
     <div class="cta-row">
       <a class="btn btn-primary" href="#install">
@@ -587,25 +615,78 @@
 </footer>
 
 <script>
-  // nav shadow on scroll
+  const reduceMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+
+  // nav shadow + scroll progress bar
   const nav = document.getElementById('nav');
-  const onScroll = () => nav.classList.toggle('scrolled', window.scrollY > 12);
+  const progress = document.getElementById('progress');
+  const onScroll = () => {
+    nav.classList.toggle('scrolled', window.scrollY > 12);
+    const h = document.documentElement.scrollHeight - window.innerHeight;
+    progress.style.width = (h > 0 ? (window.scrollY / h) * 100 : 0) + '%';
+  };
   window.addEventListener('scroll', onScroll, { passive: true }); onScroll();
 
+  // parallax orb — drifts with mouse + scroll
+  if (!reduceMotion) {
+    const orbWrap = document.querySelector('.orb-wrap');
+    const stage = document.querySelector('.orb-stage');
+    let mx = 0, my = 0, sy = 0;
+    const apply = () => {
+      if (orbWrap) orbWrap.style.transform =
+        `translate3d(${mx*22}px, ${my*16 - sy*0.06}px, 0)`;
+    };
+    if (stage) {
+      window.addEventListener('pointermove', (e) => {
+        mx = (e.clientX / window.innerWidth - .5);
+        my = (e.clientY / window.innerHeight - .5);
+        apply();
+      }, { passive: true });
+    }
+    window.addEventListener('scroll', () => { sy = window.scrollY; apply(); }, { passive: true });
+
+    // ambient field drifts slightly on scroll for depth
+    const field = document.querySelector('.field');
+    window.addEventListener('scroll', () => {
+      if (field) field.style.transform = `translateY(${window.scrollY * 0.04}px)`;
+    }, { passive: true });
+  }
+
+  // card cursor spotlight
+  document.querySelectorAll('.card').forEach(card => {
+    const spot = document.createElement('span'); spot.className = 'spot'; card.appendChild(spot);
+    if (!reduceMotion) {
+      card.addEventListener('pointermove', (e) => {
+        const r = card.getBoundingClientRect();
+        card.style.setProperty('--mx', (e.clientX - r.left) + 'px');
+        card.style.setProperty('--my', (e.clientY - r.top) + 'px');
+      });
+    }
+  });
+
   // scroll reveal
-  const reduce = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
-  if (!reduce) {
+  if (!reduceMotion) {
     const io = new IntersectionObserver((entries) => {
       entries.forEach(e => { if (e.isIntersecting) { e.target.classList.add('in'); io.unobserve(e.target); } });
     }, { threshold: 0.12, rootMargin: '0px 0px -40px 0px' });
     document.querySelectorAll('.reveal').forEach(el => io.observe(el));
+
+    // stagger tool chips when their row enters
+    const toolsRow = document.querySelector('.tools');
+    if (toolsRow) {
+      toolsRow.querySelectorAll('.tool').forEach((t, i) => { t.style.transitionDelay = (i * 45) + 'ms'; });
+      const tio = new IntersectionObserver((entries) => {
+        entries.forEach(e => { if (e.isIntersecting) { e.target.classList.add('in'); tio.unobserve(e.target); } });
+      }, { threshold: 0.2 });
+      tio.observe(toolsRow);
+    }
   } else {
-    document.querySelectorAll('.reveal').forEach(el => el.classList.add('in'));
+    document.querySelectorAll('.reveal, .tools').forEach(el => el.classList.add('in'));
   }
 
   // typed transcript loop
   const typedEl = document.getElementById('typed');
-  if (typedEl && !reduce) {
+  if (typedEl && !reduceMotion) {
     const phrases = [
       'what does this error mean?',
       'open my downloads folder',
