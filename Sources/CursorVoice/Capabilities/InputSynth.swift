@@ -140,22 +140,31 @@ enum InputSynth {
         e?.post(tap: .cghidEventTap)
     }
 
-    /// Convert image-pixel coords (top-left origin, in the captured-screenshot scale)
-    /// to CoreGraphics points (top-left origin, logical points). Uses the ratio
-    /// computed by ScreenCapture on the last screenshot — robust to weird scaled
-    /// display modes where SCDisplay.width != backingScale × frame.width.
+    /// Convert image-pixel coords (top-left origin, in the captured-screenshot
+    /// scale, relative to the captured display) to GLOBAL CoreGraphics points.
+    /// Scales by the ratio and offsets by the captured display's global origin,
+    /// so clicks land on the correct monitor in multi-display setups.
     private static func imagePxToPoint(_ imagePx: CGPoint) -> CGPoint {
         let r = ScreenCapture.pointsPerImagePixel
-        return CGPoint(x: imagePx.x * r, y: imagePx.y * r)
+        let o = ScreenCapture.capturedDisplayOrigin
+        return CGPoint(x: o.x + imagePx.x * r, y: o.y + imagePx.y * r)
     }
 
-    /// Click at a SCREEN POINT (already in logical points, top-left origin).
-    /// Used by AX-based click flows where we have the element's frame directly.
+    /// Click at a GLOBAL screen point (logical points, top-left origin) — e.g.
+    /// an Accessibility element's frame center, which AX already reports in
+    /// global top-left coordinates. Posts directly, bypassing the image-pixel
+    /// translation so there's no origin/scale round-trip error.
     static func clickPoint(_ point: CGPoint, count: Int = 1) {
-        let r = ScreenCapture.pointsPerImagePixel
-        let imagePx = (r != 0) ? CGPoint(x: point.x / r, y: point.y / r) : point
-        NSLog("InputSynth.clickPoint: point=(\(Int(point.x)),\(Int(point.y))) → imagePx=(\(Int(imagePx.x)),\(Int(imagePx.y)))")
-        click(imagePx: imagePx, button: .left, count: count)
+        NSLog("InputSynth.clickPoint: global (\(Int(point.x)),\(Int(point.y)))")
+        let (down, up): (CGEventType, CGEventType) = (.leftMouseDown, .leftMouseUp)
+        for i in 1...max(1, count) {
+            for type in [down, up] {
+                let e = CGEvent(mouseEventSource: source, mouseType: type, mouseCursorPosition: point, mouseButton: .left)
+                e?.setIntegerValueField(.mouseEventClickState, value: Int64(i))
+                e?.setIntegerValueField(.eventSourceUserData, value: eventUserDataMarker)
+                e?.post(tap: .cghidEventTap)
+            }
+        }
     }
 
     private static func keyCode(for name: String) -> Int? {

@@ -7,17 +7,7 @@ struct CursorVoiceApp: App {
 
     var body: some Scene {
         MenuBarExtra {
-            Button("Summon Orb") { appDelegate.coordinator.toggle() }
-            Divider()
-            SettingsLink { Text("Settings…") }
-                .keyboardShortcut(",")
-            Button("Check for Updates…") {
-                Task { await UpdateChecker.shared.check() }
-                NSApp.sendAction(Selector(("showSettingsWindow:")), to: nil, from: nil)
-            }
-            Divider()
-            Button("Quit Cursor Voice") { NSApp.terminate(nil) }
-                .keyboardShortcut("q")
+            MenuContent(coordinator: appDelegate.coordinator)
         } label: {
             Image(nsImage: MenuBarIcon.image)
         }
@@ -26,6 +16,40 @@ struct CursorVoiceApp: App {
             SettingsView()
                 .environmentObject(appDelegate.settings)
                 .environmentObject(appDelegate.coordinator)
+        }
+    }
+}
+
+/// Menu-bar dropdown. `SettingsLink` reliably opens/focuses the Settings
+/// scene; a simultaneous tap gesture also activates the app and pulls the
+/// window to the front (accessory apps otherwise open it behind others, and
+/// it must re-front when already open).
+private struct MenuContent: View {
+    let coordinator: AppCoordinator
+
+    var body: some View {
+        Button("Summon Orb") { coordinator.toggle() }
+        Divider()
+        SettingsLink { Text("Settings…") }
+            .keyboardShortcut(",")
+            .simultaneousGesture(TapGesture().onEnded { Self.frontSettings() })
+        SettingsLink { Text("Check for Updates…") }
+            .simultaneousGesture(TapGesture().onEnded {
+                Task { await UpdateChecker.shared.check() }
+                Self.frontSettings()
+            })
+        Divider()
+        Button("Quit Cursor Voice") { NSApp.terminate(nil) }
+            .keyboardShortcut("q")
+    }
+
+    static func frontSettings() {
+        NSApp.activate(ignoringOtherApps: true)
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.08) {
+            for w in NSApp.windows where w.styleMask.contains(.titled) && !w.isMiniaturized {
+                w.makeKeyAndOrderFront(nil)
+                w.orderFrontRegardless()
+            }
         }
     }
 }
@@ -43,6 +67,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate, ObservableObject {
         Task { @MainActor in await PermissionsOnboarding.requestAll() }
         // Check for updates on launch and periodically thereafter.
         UpdateChecker.shared.startPeriodicCheck()
+        // Full-screen brand intro (once per launch).
+        LaunchOverlay.play()
     }
 
     func applicationWillTerminate(_ notification: Notification) {

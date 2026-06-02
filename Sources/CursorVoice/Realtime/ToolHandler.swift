@@ -44,6 +44,28 @@ actor ToolHandler {
         ],
         [
             "type": "function",
+            "name": "mark_screen",
+            "description": "LAST-RESORT targeting for clicks. Takes a screenshot and overlays NUMBERED badges on every candidate clickable region (from the accessibility tree + OCR). Use this only when click_element and click_text both fail — e.g. unlabeled icons, toolbars, canvas/painted UI. Look at the returned numbered image, then call click_mark with the number on your target.",
+            "parameters": [
+                "type": "object",
+                "properties": [:] as [String: Any],
+                "required": [] as [String]
+            ]
+        ],
+        [
+            "type": "function",
+            "name": "click_mark",
+            "description": "Click the center of a numbered mark from the most recent mark_screen call.",
+            "parameters": [
+                "type": "object",
+                "properties": [
+                    "mark": ["type": "integer", "description": "The badge number to click."]
+                ],
+                "required": ["mark"]
+            ]
+        ],
+        [
+            "type": "function",
             "name": "find_text",
             "description": "Take a screenshot and OCR it with the macOS Vision framework. Returns text matches with their pixel bounding boxes. Use this when the target is visible text that's NOT exposed via the Accessibility tree (web content in Safari, Electron apps, Canvas, dynamically-painted UI). Provide a query to filter results.",
             "parameters": [
@@ -156,6 +178,40 @@ actor ToolHandler {
         ],
         [
             "type": "function",
+            "name": "browser_click_text",
+            "description": "Click a link/button/control in the FRONTMOST browser tab (Safari, Chrome, Brave, Edge, Arc) by its visible text. Runs in the page DOM — pixel-perfect, immune to scroll/layout. Prefer this over mouse_click for ANY web page element. Falls through if JavaScript-from-Apple-Events isn't enabled.",
+            "parameters": [
+                "type": "object",
+                "properties": [
+                    "text": ["type": "string", "description": "Visible text/label of the element to click."]
+                ],
+                "required": ["text"]
+            ]
+        ],
+        [
+            "type": "function",
+            "name": "browser_snapshot",
+            "description": "List the interactive elements (links, buttons, inputs) on the current browser page with their text — so you can target them with browser_click_text without a screenshot. Use on web pages before clicking.",
+            "parameters": [
+                "type": "object",
+                "properties": [:] as [String: Any],
+                "required": [] as [String]
+            ]
+        ],
+        [
+            "type": "function",
+            "name": "browser_run_js",
+            "description": "Run arbitrary JavaScript in the frontmost browser tab and return the result as text. Powerful escape hatch for reading or manipulating web pages (fill fields, extract data, navigate). Use for web tasks that browser_click_text can't express.",
+            "parameters": [
+                "type": "object",
+                "properties": [
+                    "js": ["type": "string", "description": "JavaScript expression/IIFE; its return value is stringified."]
+                ],
+                "required": ["js"]
+            ]
+        ],
+        [
+            "type": "function",
             "name": "open_url",
             "description": "Open a URL in the user's default browser (no clicking). Use this for ALL web navigation and searches — much more reliable than trying to click through Safari. For Google: https://google.com/search?q=ENCODED_QUERY. For sites: https://example.com. URL-encode spaces as + or %20.",
             "parameters": [
@@ -258,6 +314,64 @@ actor ToolHandler {
         ],
         [
             "type": "function",
+            "name": "calendar_add_event",
+            "description": "Add an event to the user's Calendar. start is 'YYYY-MM-DD HH:MM' (24-hour, local time).",
+            "parameters": [
+                "type": "object",
+                "properties": [
+                    "title": ["type": "string"],
+                    "start": ["type": "string", "description": "YYYY-MM-DD HH:MM (24h)"],
+                    "duration_minutes": ["type": "integer", "default": 60],
+                    "notes": ["type": "string"],
+                    "calendar": ["type": "string", "description": "Optional calendar name; default = first writable."]
+                ],
+                "required": ["title", "start"]
+            ]
+        ],
+        [
+            "type": "function",
+            "name": "calendar_today",
+            "description": "List the user's events for today.",
+            "parameters": ["type": "object", "properties": [:] as [String: Any], "required": [] as [String]]
+        ],
+        [
+            "type": "function",
+            "name": "reminders_add",
+            "description": "Add a reminder. due is optional 'YYYY-MM-DD HH:MM'.",
+            "parameters": [
+                "type": "object",
+                "properties": [
+                    "text": ["type": "string"],
+                    "due": ["type": "string", "description": "Optional YYYY-MM-DD HH:MM"],
+                    "list": ["type": "string", "description": "Optional list name; default list otherwise."]
+                ],
+                "required": ["text"]
+            ]
+        ],
+        [
+            "type": "function",
+            "name": "notes_create",
+            "description": "Create a note in Apple Notes (iCloud account).",
+            "parameters": [
+                "type": "object",
+                "properties": ["title": ["type": "string"], "body": ["type": "string"]],
+                "required": ["title", "body"]
+            ]
+        ],
+        [
+            "type": "function",
+            "name": "mail_compose",
+            "description": "Open a pre-filled email DRAFT in Mail (shown to the user, NEVER auto-sent).",
+            "parameters": [
+                "type": "object",
+                "properties": [
+                    "to": ["type": "string"], "subject": ["type": "string"], "body": ["type": "string"]
+                ],
+                "required": ["to", "subject", "body"]
+            ]
+        ],
+        [
+            "type": "function",
             "name": "run_applescript",
             "description": "Run an AppleScript. Returns stdout or an error.",
             "parameters": [
@@ -282,6 +396,9 @@ actor ToolHandler {
         ]
     ]
 
+    /// Marks from the most recent mark_screen call, for click_mark to resolve.
+    private var lastMarks: [MarkOverlay.Mark] = []
+
     /// Set by the realtime client to surface "AI controlling input" state to the UI.
     var inputActivity: ((Bool) -> Void)?
     /// Fires with a short human-readable label when a tool starts running.
@@ -304,11 +421,16 @@ actor ToolHandler {
         case "click_element":            return "clicking"
         case "find_text":                return "reading text on screen"
         case "click_text":               return "clicking on text"
+        case "mark_screen":              return "mapping the screen"
+        case "click_mark":               return "clicking"
         case "remember":                 return "remembering"
         case "recall":                   return "recalling"
         case "web_search":               return "searching the web"
         case "fetch_url":                return "reading a page"
         case "open_url":                 return "opening a link"
+        case "browser_click_text":       return "clicking in browser"
+        case "browser_snapshot":         return "reading the page"
+        case "browser_run_js":           return "running browser script"
         case "mouse_move":               return "moving cursor"
         case "mouse_click":              return "clicking"
         case "mouse_drag":               return "dragging"
@@ -318,6 +440,11 @@ actor ToolHandler {
         case "hotkey":                   return "pressing keys"
         case "permissions_diagnostics":  return "checking permissions"
         case "batch_actions":            return "running steps"
+        case "calendar_add_event":       return "adding to calendar"
+        case "calendar_today":           return "checking your calendar"
+        case "reminders_add":            return "adding a reminder"
+        case "notes_create":             return "creating a note"
+        case "mail_compose":             return "drafting an email"
         case "run_applescript":          return "running script"
         case "run_shell":                return "running command"
         default:                         return tool
@@ -385,6 +512,47 @@ actor ToolHandler {
                 "via": pressed ? "AXPress" : "coordinate",
                 "clicked": ["role": match.role, "title": match.title]
             ])
+
+        case "mark_screen":
+            NSLog("Tool: mark_screen")
+            let shot = await ScreenCapture.shared.capture()
+            guard let cg = shot.cgImage else {
+                return ToolDispatchResult(outputJSON: encode(["error": "screen capture failed"]),
+                                          attachedImageBase64: nil)
+            }
+            let ax = AXTree.enumerateFrontmost()
+            let ocr = await OCR.recognize(in: cg)
+            let (marks, annotated) = MarkOverlay.build(baseImage: cg, axElements: ax, ocr: ocr)
+            self.lastMarks = marks
+            let listing = marks.map { m -> [String: Any] in
+                ["mark": m.index, "label": m.label]
+            }
+            return ToolDispatchResult(
+                outputJSON: encode([
+                    "count": marks.count,
+                    "marks": listing,
+                    "note": "Numbered badges are drawn on the attached image. Call click_mark with the number on your target."
+                ]),
+                attachedImageBase64: annotated ?? shot.imageBase64
+            )
+
+        case "click_mark":
+            let n = (args["mark"] as? Int) ?? number(args["mark"]).map { Int($0) } ?? -1
+            NSLog("Tool: click_mark \(n)")
+            guard let m = lastMarks.first(where: { $0.index == n }) else {
+                return ToolDispatchResult(outputJSON: encode([
+                    "error": "no mark numbered \(n)",
+                    "hint": "call mark_screen first"
+                ]), attachedImageBase64: nil)
+            }
+            // bbox is image pixels → click via the image-pixel path (handles scale + display origin).
+            let center = CGPoint(x: m.bbox.midX, y: m.bbox.midY)
+            self.inputActivity?(true)
+            InputSynth.click(imagePx: center, button: .left, count: 1)
+            try? await Task.sleep(nanoseconds: 250_000_000)
+            self.inputActivity?(false)
+            return await confirmWithScreenshot(["ok": true, "action": "click_mark",
+                                                "mark": n, "label": m.label])
 
         case "find_text":
             let q = args["query"] as? String
@@ -517,6 +685,22 @@ actor ToolHandler {
             let result = await WebSearch.fetch(urlString)
             return ToolDispatchResult(outputJSON: encode(result), attachedImageBase64: nil)
 
+        case "browser_click_text":
+            let text = (args["text"] as? String) ?? ""
+            NSLog("Tool: browser_click_text \"\(text)\"")
+            let res = BrowserBridge.clickText(text)
+            // Verify with a screenshot since a DOM click may change the page.
+            return await confirmWithScreenshot(res)
+
+        case "browser_snapshot":
+            NSLog("Tool: browser_snapshot")
+            return ToolDispatchResult(outputJSON: encode(BrowserBridge.snapshot()), attachedImageBase64: nil)
+
+        case "browser_run_js":
+            let js = (args["js"] as? String) ?? ""
+            NSLog("Tool: browser_run_js \(js.prefix(80))")
+            return ToolDispatchResult(outputJSON: encode(BrowserBridge.runJS(js)), attachedImageBase64: nil)
+
         case "open_url":
             let urlString = (args["url"] as? String) ?? ""
             NSLog("Tool: open_url \(urlString)")
@@ -599,6 +783,43 @@ actor ToolHandler {
             NSLog("Tool: press_key \(mods.joined(separator: "+"))+\(key)")
             InputSynth.pressKey(key, modifiers: mods)
             return await confirmWithScreenshot(["ok": true, "action": "press_key"])
+
+        case "calendar_add_event":
+            NSLog("Tool: calendar_add_event")
+            let out = NativeConnectors.calendarAddEvent(
+                title: (args["title"] as? String) ?? "",
+                start: (args["start"] as? String) ?? "",
+                durationMinutes: (args["duration_minutes"] as? Int) ?? 60,
+                notes: (args["notes"] as? String) ?? "",
+                calendar: (args["calendar"] as? String) ?? "")
+            return ToolDispatchResult(outputJSON: encode(out), attachedImageBase64: nil)
+
+        case "calendar_today":
+            NSLog("Tool: calendar_today")
+            return ToolDispatchResult(outputJSON: encode(NativeConnectors.calendarToday()), attachedImageBase64: nil)
+
+        case "reminders_add":
+            NSLog("Tool: reminders_add")
+            let out = NativeConnectors.remindersAdd(
+                text: (args["text"] as? String) ?? "",
+                due: (args["due"] as? String) ?? "",
+                list: (args["list"] as? String) ?? "")
+            return ToolDispatchResult(outputJSON: encode(out), attachedImageBase64: nil)
+
+        case "notes_create":
+            NSLog("Tool: notes_create")
+            let out = NativeConnectors.notesCreate(
+                title: (args["title"] as? String) ?? "",
+                body: (args["body"] as? String) ?? "")
+            return ToolDispatchResult(outputJSON: encode(out), attachedImageBase64: nil)
+
+        case "mail_compose":
+            NSLog("Tool: mail_compose")
+            let out = NativeConnectors.mailCompose(
+                to: (args["to"] as? String) ?? "",
+                subject: (args["subject"] as? String) ?? "",
+                body: (args["body"] as? String) ?? "")
+            return ToolDispatchResult(outputJSON: encode(out), attachedImageBase64: nil)
 
         case "run_applescript":
             let script = (args["script"] as? String) ?? ""

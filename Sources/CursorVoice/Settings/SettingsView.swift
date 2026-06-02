@@ -1,4 +1,5 @@
 import SwiftUI
+import AppKit
 
 struct SettingsView: View {
     @EnvironmentObject var settings: SettingsStore
@@ -16,6 +17,16 @@ struct SettingsView: View {
             }
         }
         .frame(width: 500, height: 460)
+        .onAppear {
+            // Accessory (menu-bar) apps open windows behind whatever's frontmost.
+            // Force the app + its settings window to the front.
+            NSApp.activate(ignoringOtherApps: true)
+            DispatchQueue.main.async {
+                for w in NSApp.windows where w.title.contains("Settings") || w.styleMask.contains(.titled) {
+                    w.makeKeyAndOrderFront(nil)
+                }
+            }
+        }
     }
 }
 

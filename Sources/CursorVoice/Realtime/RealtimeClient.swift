@@ -127,6 +127,7 @@ final class RealtimeClient: NSObject, URLSessionWebSocketDelegate {
     // MARK: - Outgoing
 
     private func sendSessionUpdate() {
+        let allTools = ToolHandler.toolDefinitions
         let session: [String: Any] = [
             "type": "realtime",
             "model": model,
@@ -153,7 +154,7 @@ final class RealtimeClient: NSObject, URLSessionWebSocketDelegate {
                     "voice": voice
                 ]
             ],
-            "tools": ToolHandler.toolDefinitions,
+            "tools": allTools,
             "tool_choice": "auto"
         ]
         send(event: ["type": "session.update", "session": session])

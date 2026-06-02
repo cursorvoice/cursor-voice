@@ -9,6 +9,7 @@ struct PermissionsView: View {
     @State private var speechGranted = false
     @State private var screenGranted = false
     @State private var accessibilityGranted = false
+    @State private var fullDiskGranted = false
 
     private let refreshTimer = Timer.publish(every: 2.0, on: .main, in: .common).autoconnect()
 
@@ -45,6 +46,12 @@ struct PermissionsView: View {
                     anchor: "Privacy_Accessibility") {
                     _ = InputSynth.requestAccessibility()
                     refresh()
+                }
+                row(name: "Full Disk Access",
+                    granted: fullDiskGranted,
+                    hint: "Lets the assistant read & work with ALL your files (Downloads, Desktop, Documents…). Without it, those folders are off-limits. Needs an app relaunch after granting.",
+                    anchor: "Privacy_AllFiles") {
+                    openSystemSettings(anchor: "Privacy_AllFiles")
                 }
             } header: { Text("Permissions") }
 
@@ -98,5 +105,22 @@ struct PermissionsView: View {
         speechGranted        = SFSpeechRecognizer.authorizationStatus() == .authorized
         screenGranted        = CGPreflightScreenCaptureAccess()
         accessibilityGranted = AXIsProcessTrusted()
+        fullDiskGranted      = Self.hasFullDiskAccess()
+    }
+
+    /// Heuristic FDA check: a protected, FDA-gated path is only readable when
+    /// Full Disk Access is granted. (No public API exists for this.)
+    private static func hasFullDiskAccess() -> Bool {
+        let probes = [
+            ("\(NSHomeDirectory())/Library/Safari/Bookmarks.plist"),
+            ("/Library/Application Support/com.apple.TCC/TCC.db")
+        ]
+        for p in probes where FileManager.default.fileExists(atPath: p) {
+            if FileManager.default.isReadableFile(atPath: p),
+               (try? FileHandle(forReadingFrom: URL(fileURLWithPath: p)))?.closeFile() != nil {
+                return true
+            }
+        }
+        return false
     }
 }

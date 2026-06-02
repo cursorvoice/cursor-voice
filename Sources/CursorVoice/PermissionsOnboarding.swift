@@ -13,7 +13,22 @@ enum PermissionsOnboarding {
         await requestSpeech()
         requestScreenRecording()
         requestAccessibility()
+        requestFileAccess()
         NSLog("Onboarding: permission requests issued")
+    }
+
+    /// Touch the protected user folders so macOS shows its "would like to access
+    /// files in your Downloads/Desktop/Documents folder" prompts. (There's no
+    /// programmatic prompt for full disk access — that's granted manually in
+    /// System Settings — but these per-folder prompts cover everyday files.)
+    private static func requestFileAccess() {
+        let fm = FileManager.default
+        let home = fm.homeDirectoryForCurrentUser
+        for folder in ["Downloads", "Desktop", "Documents"] {
+            let url = home.appendingPathComponent(folder)
+            // Listing the directory triggers the TCC prompt on first access.
+            _ = try? fm.contentsOfDirectory(atPath: url.path)
+        }
     }
 
     private static func requestAccessibility() {

@@ -15,6 +15,12 @@ final class ScreenCapture {
     /// returns true native pixels (then ratio ≈ 1/backingScale).
     nonisolated(unsafe) static var pointsPerImagePixel: CGFloat = 1.0
 
+    /// Top-left origin (in GLOBAL CoreGraphics display points) of the display
+    /// captured in the most recent screenshot. Image-pixel coordinates the
+    /// model returns are relative to THIS display; InputSynth adds this origin
+    /// so clicks land on the right monitor in multi-display setups.
+    nonisolated(unsafe) static var capturedDisplayOrigin: CGPoint = .zero
+
     /// Result returned to the realtime client.
     /// `imageBase64` is the JPEG payload that will be injected as an
     /// input_image conversation item so the model can see what's on screen.
@@ -61,14 +67,14 @@ final class ScreenCapture {
             }
             let b64 = jpeg.base64EncodedString()
 
-            // Record the image-pixel ↔ screen-point ratio for InputSynth.
-            if let nsScreen = NSScreen.screens.first(where: {
-                let id = ($0.deviceDescription[NSDeviceDescriptionKey("NSScreenNumber")] as? CGDirectDisplayID)
-                return id == display.displayID
-            }) ?? NSScreen.main {
-                Self.pointsPerImagePixel = nsScreen.frame.width / CGFloat(cfg.width)
-            }
-            NSLog("ScreenCapture: \(cfg.width)x\(cfg.height), \(jpeg.count) bytes JPEG, frontmost=\(frontmost), pt/px=\(Self.pointsPerImagePixel)")
+            // Record the image-pixel ↔ screen-point mapping for InputSynth.
+            // CGDisplayBounds gives the display's rect in GLOBAL CG points with
+            // a top-left origin — exactly the space CGEvent posts into — so it
+            // handles multi-display offsets without any NSScreen flip math.
+            let bounds = CGDisplayBounds(display.displayID)
+            Self.capturedDisplayOrigin = bounds.origin
+            Self.pointsPerImagePixel = bounds.width > 0 ? bounds.width / CGFloat(cfg.width) : 1.0
+            NSLog("ScreenCapture: \(cfg.width)x\(cfg.height), origin=(\(Int(bounds.origin.x)),\(Int(bounds.origin.y))), pt/px=\(Self.pointsPerImagePixel), frontmost=\(frontmost)")
 
             return Result(
                 metadata: [

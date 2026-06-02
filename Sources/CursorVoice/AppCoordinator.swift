@@ -56,6 +56,9 @@ final class AppCoordinator: ObservableObject {
         wakeWord.onDetect = { [weak self] in
             Task { @MainActor in self?.activate() }
         }
+
+        // NOTE: MCP connections are deferred for now (code retained in
+        // MCPClient/MCPManager for a later release). Not connected at startup.
     }
 
     func stop() {
@@ -210,22 +213,24 @@ final class AppCoordinator: ObservableObject {
     1. Live info / news / current facts → web_search, then fetch_url for full page.
     2. Web navigation → open_url (NEVER click through Safari to navigate).
     3. macOS app control (Music, Mail, Calendar, Finder, Messages, Notes, etc.) → run_applescript.
-    4. Clicking a labeled UI element (button, link, menu item, text field) →
-       list_ui_elements then click_element. INTERNALLY tries AXPress (no mouse simulation —
-       fires the action directly) and falls back to coord-click only if AXPress fails.
-       This is by FAR the most reliable click path; prefer it.
-    5. Clicking VISIBLE TEXT that's NOT in the AX tree (web content, Electron, Canvas) →
-       find_text / click_text. Vision-framework OCR + click. Use this when click_element
-       can't find the target.
-    6. Address bar in any browser → press_key "l" with ["cmd"], or hotkey ["cmd","l"].
-    7. Multi-step automation → batch_actions with a list of steps. Massive latency win
-       vs. one tool call per step.
-    8. Shell / system → run_shell.
-    9. mouse_click / mouse_drag are the ABSOLUTE LAST RESORT — only when AX is empty
-       AND OCR can't find readable text. When forced into this path:
-         a. see_screen first (own windows excluded).
-         b. Coordinates are image pixels, top-left origin, exact scale of the screenshot.
-         c. Aim CENTER of the target.
+    4. Acting on a WEB PAGE (anything in Safari/Chrome/Brave/Edge/Arc) → browser_click_text
+       to click by visible text, browser_snapshot to see what's on the page, browser_run_js
+       for anything else. This runs in the real DOM and is the most reliable web path —
+       prefer it over screenshots/clicking for web content.
+    5. Clicking a labeled native UI element (button, link, menu item, text field) →
+       list_ui_elements then click_element. INTERNALLY tries AXPress (fires the action with
+       no mouse simulation) and falls back to coord-click. The most reliable native path.
+    6. Clicking VISIBLE TEXT not in the AX tree → find_text / click_text (Vision OCR + click).
+    7. App actions — calendar_add_event, calendar_today, reminders_add, notes_create,
+       mail_compose — use these for those apps instead of clicking.
+    8. Address bar in any browser → hotkey ["cmd","l"].
+    9. Multi-step automation → batch_actions. Big latency win vs. one call per step.
+    10. Shell / system → run_shell.
+    11. If a native target has NO label and NO readable text (icons, toolbars, canvas) →
+        mark_screen to get numbered candidates, then click_mark with the number.
+    12. mouse_click / mouse_drag are the ABSOLUTE LAST RESORT — only when everything above
+        fails. see_screen first; coordinates are image pixels, top-left origin, exact scale;
+        aim CENTER of the target.
 
     DIAGNOSIS:
     • If a tool fails or you suspect it might (no permission, blocked, etc.), call
