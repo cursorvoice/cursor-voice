@@ -193,9 +193,15 @@ private struct AdvancedTab: View {
             } header: { Text("Realtime") }
 
             Section {
-                Text("Capabilities: see screen, run AppleScript, run shell. The model will ask for confirmation before executing AppleScript or shell.")
-                    .font(.caption).foregroundStyle(.secondary)
-            } header: { Text("Capabilities") }
+                Toggle("Allow risky shell commands", isOn: Binding(
+                    get: { settings.allowRiskyShellCommands },
+                    set: { settings.setAllowRiskyShellCommands($0) }))
+                Text(settings.allowRiskyShellCommands
+                     ? "⚠️ Risky commands are ALLOWED. The assistant can run destructive shell commands (recursive deletes, disk formatting, running as root, piping a download into a shell). The model can be steered by on-screen or web content — leave this off unless you understand the risk."
+                     : "Commands that look destructive (recursive deletes, disk formatting, running as root, piping a download into a shell) are blocked by default. Turn this on to let the assistant run them anyway — at your own risk.")
+                    .font(.caption)
+                    .foregroundStyle(settings.allowRiskyShellCommands ? .orange : .secondary)
+            } header: { Text("Shell commands") }
 
             Section {
                 Button("Reset all settings…", role: .destructive) {

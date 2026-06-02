@@ -64,6 +64,8 @@ final class SettingsStore: ObservableObject {
     @Published var wakeWordPhrase: String
     /// Core Audio UID of the chosen mic, or nil for the system default input.
     @Published var inputDeviceUID: String?
+    /// Opt-in: let the assistant run shell commands flagged as risky. Off by default.
+    @Published var allowRiskyShellCommands: Bool
 
     private let keychain = KeychainStore(service: "com.cursorvoice.app", account: "openai-api-key")
     private let defaults = UserDefaults.standard
@@ -75,6 +77,7 @@ final class SettingsStore: ObservableObject {
         self.wakeWordEnabled = defaults.bool(forKey: "wakeWordEnabled")
         self.wakeWordPhrase = defaults.string(forKey: "wakeWordPhrase") ?? "hey cursor"
         self.inputDeviceUID = defaults.string(forKey: "inputDeviceUID")
+        self.allowRiskyShellCommands = defaults.bool(forKey: ShellRunner.allowRiskyKey)
 
         if let data = defaults.data(forKey: "hotkey"),
            let spec = try? JSONDecoder().decode(HotkeySpec.self, from: data) {
@@ -108,11 +111,12 @@ final class SettingsStore: ObservableObject {
     }
     func setWakeWordEnabled(_ v: Bool) { wakeWordEnabled = v; defaults.set(v, forKey: "wakeWordEnabled") }
     func setWakeWordPhrase(_ v: String) { wakeWordPhrase = v; defaults.set(v, forKey: "wakeWordPhrase") }
+    func setAllowRiskyShellCommands(_ v: Bool) { allowRiskyShellCommands = v; defaults.set(v, forKey: ShellRunner.allowRiskyKey) }
 
     /// Wipe persisted UserDefaults + Keychain and reset published state to defaults.
     /// The app keeps running; user can re-enter the API key afterwards.
     func resetAll() {
-        for key in ["hotkey", "model", "voice", "wakeWordEnabled", "wakeWordPhrase", "inputDeviceUID"] {
+        for key in ["hotkey", "model", "voice", "wakeWordEnabled", "wakeWordPhrase", "inputDeviceUID", ShellRunner.allowRiskyKey] {
             defaults.removeObject(forKey: key)
         }
         try? keychain.write("")
@@ -123,6 +127,7 @@ final class SettingsStore: ObservableObject {
         wakeWordEnabled = false
         wakeWordPhrase = "hey cursor"
         inputDeviceUID = nil
+        allowRiskyShellCommands = false
     }
 
     func openSettings() {
