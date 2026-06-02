@@ -34,6 +34,7 @@ private struct GeneralTab: View {
     @EnvironmentObject var settings: SettingsStore
     @State private var apiKeyField: String = ""
     @State private var recording = false
+    @State private var inputDevices: [AudioInputDevice] = []
 
     var body: some View {
         Form {
@@ -49,6 +50,19 @@ private struct GeneralTab: View {
                         .disabled(apiKeyField.isEmpty)
                 }
             } header: { Text("OpenAI API key") }
+
+            Section {
+                Picker("Microphone", selection: Binding(
+                    get: { settings.inputDeviceUID ?? "" },
+                    set: { settings.setInputDeviceUID($0.isEmpty ? nil : $0) })) {
+                    Text("System Default").tag("")
+                    ForEach(inputDevices) { d in
+                        Text(d.name).tag(d.uid)
+                    }
+                }
+                Text("Which microphone the assistant listens through. Applies on the next time you summon the orb.")
+                    .font(.caption).foregroundStyle(.secondary)
+            } header: { Text("Microphone input") }
 
             Section {
                 HStack {
@@ -81,7 +95,10 @@ private struct GeneralTab: View {
             } header: { Text("Wake word") }
         }
         .formStyle(.grouped)
-        .onAppear { apiKeyField = settings.apiKey ?? "" }
+        .onAppear {
+            apiKeyField = settings.apiKey ?? ""
+            inputDevices = AudioDevices.inputDevices()
+        }
     }
 
     private func commitKey() { settings.setAPIKey(apiKeyField) }

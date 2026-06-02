@@ -29,7 +29,7 @@ final class RealtimeClient: NSObject, URLSessionWebSocketDelegate {
     private var activeAssistantItemId: String?
     private var emittedOutputBytes: Int = 0   // total PCM16 24kHz bytes received this response
 
-    init(apiKey: String, model: String, voice: String, instructions: String) {
+    init(apiKey: String, model: String, voice: String, instructions: String, inputDeviceUID: String? = nil) {
         self.apiKey = apiKey
         self.model = model
         self.voice = voice
@@ -37,6 +37,7 @@ final class RealtimeClient: NSObject, URLSessionWebSocketDelegate {
         super.init()
         session = URLSession(configuration: .default, delegate: self, delegateQueue: nil)
 
+        audio.preferredInputUID = inputDeviceUID
         audio.onInputChunk = { [weak self] data in self?.sendAudioChunk(data) }
         audio.onInputLevel = { [weak self] level in self?.onAudioLevel?(level) }
         audio.onOutputLevel = { _ in }

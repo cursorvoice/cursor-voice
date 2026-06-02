@@ -53,6 +53,12 @@ final class AppCoordinator: ObservableObject {
             .sink { [weak self] _ in self?.reconnectIfActive() }
             .store(in: &cancellables)
 
+        settings.$inputDeviceUID
+            .dropFirst()
+            .removeDuplicates()
+            .sink { [weak self] _ in self?.reconnectIfActive() }
+            .store(in: &cancellables)
+
         wakeWord.onDetect = { [weak self] in
             Task { @MainActor in self?.activate() }
         }
@@ -128,7 +134,8 @@ final class AppCoordinator: ObservableObject {
         let client = RealtimeClient(apiKey: apiKey,
                                     model: settings.model,
                                     voice: settings.voice,
-                                    instructions: Self.buildInstructions())
+                                    instructions: Self.buildInstructions(),
+                                    inputDeviceUID: settings.inputDeviceUID)
         client.onStateChange = { [weak self] state in
             Task { @MainActor in self?.orbState.connection = state }
         }

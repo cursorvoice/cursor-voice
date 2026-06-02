@@ -62,6 +62,8 @@ final class SettingsStore: ObservableObject {
     @Published var hotkey: HotkeySpec
     @Published var wakeWordEnabled: Bool
     @Published var wakeWordPhrase: String
+    /// Core Audio UID of the chosen mic, or nil for the system default input.
+    @Published var inputDeviceUID: String?
 
     private let keychain = KeychainStore(service: "com.cursorvoice.app", account: "openai-api-key")
     private let defaults = UserDefaults.standard
@@ -72,6 +74,7 @@ final class SettingsStore: ObservableObject {
         self.voice = defaults.string(forKey: "voice") ?? "marin"
         self.wakeWordEnabled = defaults.bool(forKey: "wakeWordEnabled")
         self.wakeWordPhrase = defaults.string(forKey: "wakeWordPhrase") ?? "hey cursor"
+        self.inputDeviceUID = defaults.string(forKey: "inputDeviceUID")
 
         if let data = defaults.data(forKey: "hotkey"),
            let spec = try? JSONDecoder().decode(HotkeySpec.self, from: data) {
@@ -98,13 +101,18 @@ final class SettingsStore: ObservableObject {
 
     func setModel(_ value: String) { model = value; defaults.set(value, forKey: "model") }
     func setVoice(_ value: String) { voice = value; defaults.set(value, forKey: "voice") }
+    func setInputDeviceUID(_ uid: String?) {
+        inputDeviceUID = uid
+        if let uid = uid { defaults.set(uid, forKey: "inputDeviceUID") }
+        else { defaults.removeObject(forKey: "inputDeviceUID") }
+    }
     func setWakeWordEnabled(_ v: Bool) { wakeWordEnabled = v; defaults.set(v, forKey: "wakeWordEnabled") }
     func setWakeWordPhrase(_ v: String) { wakeWordPhrase = v; defaults.set(v, forKey: "wakeWordPhrase") }
 
     /// Wipe persisted UserDefaults + Keychain and reset published state to defaults.
     /// The app keeps running; user can re-enter the API key afterwards.
     func resetAll() {
-        for key in ["hotkey", "model", "voice", "wakeWordEnabled", "wakeWordPhrase"] {
+        for key in ["hotkey", "model", "voice", "wakeWordEnabled", "wakeWordPhrase", "inputDeviceUID"] {
             defaults.removeObject(forKey: key)
         }
         try? keychain.write("")
@@ -114,6 +122,7 @@ final class SettingsStore: ObservableObject {
         hotkey = .defaultSpec
         wakeWordEnabled = false
         wakeWordPhrase = "hey cursor"
+        inputDeviceUID = nil
     }
 
     func openSettings() {

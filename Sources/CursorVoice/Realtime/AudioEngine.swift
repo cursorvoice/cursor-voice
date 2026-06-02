@@ -1,5 +1,6 @@
 import AVFoundation
 import Accelerate
+import CoreAudio
 
 /// Captures mic audio at 24kHz mono PCM16 and plays back PCM16 chunks
 /// received from the Realtime API. Exposes input/output level callbacks.
@@ -10,6 +11,9 @@ final class AudioEngine {
 
     private let sampleRate: Double = 24000
     private var inputConverter: AVAudioConverter?
+
+    /// UID of the input device to use (nil = system default). Set before start().
+    var preferredInputUID: String?
 
     /// Fires on the audio thread — hop to main if updating UI.
     var onInputChunk: ((Data) -> Void)?
@@ -25,6 +29,7 @@ final class AudioEngine {
 
     func start() throws {
         guard !isRunning else { return }
+        applyPreferredInputDevice()
         let input = engine.inputNode
         let inputFormat = input.outputFormat(forBus: 0)
         let targetFormat = AVAudioFormat(commonFormat: .pcmFormatInt16,
@@ -50,6 +55,24 @@ final class AudioEngine {
         try engine.start()
         player.play()
         isRunning = true
+    }
+
+    /// Point the engine's input node at the user-selected Core Audio device.
+    /// Must be set on the input node's audio unit before the engine starts.
+    private func applyPreferredInputDevice() {
+        guard let uid = preferredInputUID,
+              let deviceID = AudioDevices.deviceID(forUID: uid),
+              let au = engine.inputNode.audioUnit else { return }
+        var dev = deviceID
+        let status = AudioUnitSetProperty(au,
+                                          kAudioOutputUnitProperty_CurrentDevice,
+                                          kAudioUnitScope_Global, 0,
+                                          &dev, UInt32(MemoryLayout<AudioDeviceID>.size))
+        if status != noErr {
+            NSLog("AudioEngine: failed to set input device \(uid) (\(status)) — using default")
+        } else {
+            NSLog("AudioEngine: using input device \(uid)")
+        }
     }
 
     func stop() {
