@@ -2,7 +2,7 @@
 # Cursor Voice one-line installer.
 #
 # Usage:
-#   curl -fsSL https://raw.githubusercontent.com/tottenabderrahmane1-create/cursor-voice/main/install.sh | bash
+#   curl -fsSL https://raw.githubusercontent.com/cursorvoice/cursor-voice/main/install.sh | bash
 #
 # What it does:
 #   1. Verifies macOS 14+ on Apple Silicon
@@ -12,7 +12,7 @@
 #   5. Launches the app
 set -euo pipefail
 
-REPO="tottenabderrahmane1-create/cursor-voice"
+REPO="cursorvoice/cursor-voice"
 APP_NAME="CursorVoice"
 
 #--- sanity checks -----------------------------------------------------------

@@ -29,7 +29,7 @@ final class UpdateChecker: ObservableObject {
         let body: String
     }
 
-    private let repo = "tottenabderrahmane1-create/cursor-voice"
+    private let repo = "cursorvoice/cursor-voice"
     private var timer: Timer?
 
     /// Reads CFBundleShortVersionString from Info.plist. Defaults to "0.0.0"

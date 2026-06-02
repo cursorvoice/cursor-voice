@@ -27,7 +27,7 @@ A native macOS voice assistant that lives next to your cursor. Press a hotkey, t
 ### One-line installer (curl)
 
 ```bash
-curl -fsSL https://raw.githubusercontent.com/tottenabderrahmane1-create/cursor-voice/main/install.sh | bash
+curl -fsSL https://raw.githubusercontent.com/cursorvoice/cursor-voice/main/install.sh | bash
 ```
 
 Downloads the latest release, copies the app into `/Applications`, strips the quarantine attribute, and launches it. Done.
@@ -35,7 +35,7 @@ Downloads the latest release, copies the app into `/Applications`, strips the qu
 ### Homebrew
 
 ```bash
-brew tap tottenabderrahmane1-create/cursor-voice
+brew tap cursorvoice/cursor-voice
 brew install --cask cursor-voice
 ```
 
@@ -43,7 +43,7 @@ The cask's `postflight` strips quarantine automatically — no right-click-Open 
 
 ### Manual
 
-1. Download the DMG from the [latest release](https://github.com/tottenabderrahmane1-create/cursor-voice/releases/latest).
+1. Download the DMG from the [latest release](https://github.com/cursorvoice/cursor-voice/releases/latest).
 2. Open it, drag **Cursor Voice** into Applications.
 3. **First launch**: macOS Gatekeeper will refuse to open it (it's ad-hoc signed, no paid Developer ID). Fix with one of:
    - **Right-click the app → Open** → confirm in the dialog.
@@ -114,7 +114,7 @@ You can see live status in **Settings → Permissions** with deep-link buttons t
 Requirements: macOS 14+, Command Line Tools (`xcode-select --install`).
 
 ```bash
-git clone https://github.com/tottenabderrahmane1-create/cursor-voice.git
+git clone https://github.com/cursorvoice/cursor-voice.git
 cd cursor-voice
 ./scripts/build.sh
 ./scripts/dmg.sh
@@ -148,7 +148,7 @@ There's no Xcode project required — the codebase is plain Swift sources organi
 
 Cursor Voice is free and open source. Keeping the project online (domain, etc.) costs a little each year — if the app is useful to you, a small tip covers it and is genuinely appreciated. There's a **Sponsor** button at the top of this repo.
 
-**Questions or bug reports:** open a [GitHub issue](https://github.com/tottenabderrahmane1-create/cursor-voice/issues) or email **support@cursorvoice.app**.
+**Questions or bug reports:** open a [GitHub issue](https://github.com/cursorvoice/cursor-voice/issues) or email **support@cursorvoice.app**.
 
 Thank you 💜
 

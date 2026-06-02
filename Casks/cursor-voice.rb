@@ -2,10 +2,10 @@ cask "cursor-voice" do
   version "0.5.1"
   sha256 "9c914da846474a5d49c6d400bff8742ef557242c296ab84c93162f06d22a1220"
 
-  url "https://github.com/tottenabderrahmane1-create/cursor-voice/releases/download/v#{version}/CursorVoice-#{version}.dmg"
+  url "https://github.com/cursorvoice/cursor-voice/releases/download/v#{version}/CursorVoice-#{version}.dmg"
   name "Cursor Voice"
   desc "Voice-driven macOS assistant powered by the OpenAI Realtime API"
-  homepage "https://github.com/tottenabderrahmane1-create/cursor-voice"
+  homepage "https://github.com/cursorvoice/cursor-voice"
 
   livecheck do
     url :url
