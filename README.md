@@ -144,6 +144,12 @@ There's no Xcode project required — the codebase is plain Swift sources organi
 - **Ad-hoc signature.** No paid Developer ID, so no notarization. Gatekeeper will block on first launch — see install instructions above.
 - **Apple Silicon only.** Built for `arm64-apple-macos14.0`.
 
+## Support
+
+Cursor Voice is free and open source. Keeping the project online (domain, etc.) costs a little each year — if the app is useful to you, a small tip covers it and is genuinely appreciated. There's a **Sponsor** button at the top of this repo.
+
+Thank you 💜
+
 ## License
 
 MIT.
