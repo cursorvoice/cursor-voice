@@ -67,8 +67,13 @@ final class AppDelegate: NSObject, NSApplicationDelegate, ObservableObject {
         Task { @MainActor in await PermissionsOnboarding.requestAll() }
         // Check for updates on launch and periodically thereafter.
         UpdateChecker.shared.startPeriodicCheck()
-        // Full-screen brand intro (once per launch).
-        LaunchOverlay.play()
+        // Not signed in → full-screen welcome / sign-in gate.
+        // Signed in → the brand intro (first launch only).
+        if GoogleAuth.shared.identity == nil {
+            SignInGate.presentIfNeeded()
+        } else {
+            LaunchOverlay.play()
+        }
     }
 
     func applicationWillTerminate(_ notification: Notification) {

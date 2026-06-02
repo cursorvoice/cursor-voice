@@ -82,6 +82,12 @@ final class AppCoordinator: ObservableObject {
     func activate() {
         NSLog("Coordinator: activate()")
         guard !orbState.isVisible else { return }
+        // Gate all usage behind sign-in — surface the welcome instead of the orb.
+        guard GoogleAuth.shared.identity != nil else {
+            NSLog("Coordinator: not signed in; showing sign-in gate")
+            SignInGate.presentIfNeeded()
+            return
+        }
         guard let key = settings.apiKey, !key.isEmpty else {
             NSLog("Coordinator: no API key set; beeping and opening settings")
             NSSound.beep()

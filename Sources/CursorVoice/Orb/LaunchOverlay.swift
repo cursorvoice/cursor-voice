@@ -150,35 +150,3 @@ private struct LaunchView: View {
     }
 }
 
-/// Flowing northern-lights bands rendered with a Canvas of sine-displaced
-/// thick strokes, heavily blurred so they read as soft aurora curtains.
-private struct AuroraRibbons: View {
-    let reduceMotion: Bool
-    let colors: [Color]
-
-    var body: some View {
-        TimelineView(.animation(minimumInterval: 1.0 / 30.0, paused: reduceMotion)) { ctx in
-            let t = reduceMotion ? 0 : ctx.date.timeIntervalSinceReferenceDate
-            Canvas { gc, size in
-                for i in 0..<colors.count {
-                    var path = Path()
-                    let yBase = size.height * (0.34 + 0.11 * Double(i))
-                    let amp = 70.0 + 20.0 * Double(i)
-                    let speed = 0.35 + 0.12 * Double(i)
-                    var x = 0.0
-                    path.move(to: CGPoint(x: 0, y: yBase))
-                    while x <= size.width {
-                        let phase = (x / size.width) * .pi * 3 + t * speed + Double(i)
-                        let y = yBase + sin(phase) * amp
-                        path.addLine(to: CGPoint(x: x, y: y))
-                        x += 10
-                    }
-                    gc.stroke(path, with: .color(colors[i].opacity(0.5)),
-                              style: StrokeStyle(lineWidth: 110, lineCap: .round))
-                }
-            }
-            .blur(radius: 70)
-            .blendMode(.screen)
-        }
-    }
-}

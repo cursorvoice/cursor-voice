@@ -32,12 +32,68 @@ struct SettingsView: View {
 
 private struct GeneralTab: View {
     @EnvironmentObject var settings: SettingsStore
+    @ObservedObject private var google = GoogleAuth.shared
     @State private var apiKeyField: String = ""
     @State private var recording = false
     @State private var inputDevices: [AudioInputDevice] = []
+    @State private var googleID: String = ""
+    @State private var googleSecret: String = ""
+    @State private var showGoogleSetup = false
 
     var body: some View {
         Form {
+            Section {
+                if let id = google.identity {
+                    HStack(spacing: 10) {
+                        Image(systemName: "person.crop.circle.fill")
+                            .font(.system(size: 26)).foregroundStyle(.tint)
+                        VStack(alignment: .leading, spacing: 1) {
+                            Text(id.name).fontWeight(.medium)
+                            Text(id.email).font(.caption).foregroundStyle(.secondary)
+                        }
+                        Spacer()
+                        Button("Sign out") { google.signOut() }.buttonStyle(.bordered)
+                    }
+                } else {
+                    Button {
+                        if google.isConfigured { google.signIn() } else { showGoogleSetup = true }
+                    } label: {
+                        HStack(spacing: 8) {
+                            if google.inProgress { ProgressView().controlSize(.small) }
+                            Image(systemName: "g.circle.fill")
+                            Text(google.inProgress ? "Signing in…" : "Sign in with Google")
+                        }
+                    }
+                    .buttonStyle(.borderedProminent)
+                    .disabled(google.inProgress)
+
+                    Button("OAuth setup…") { showGoogleSetup = true }
+                        .buttonStyle(.borderless).font(.caption)
+
+                    if let err = google.lastError {
+                        Text(err).font(.caption).foregroundStyle(.orange).lineLimit(3)
+                    }
+                }
+
+                if showGoogleSetup {
+                    VStack(alignment: .leading, spacing: 6) {
+                        Text("Paste your Google OAuth client (Desktop app) credentials:")
+                            .font(.caption).foregroundStyle(.secondary)
+                        TextField("Client ID (…apps.googleusercontent.com)", text: $googleID)
+                            .textFieldStyle(.roundedBorder)
+                        TextField("Client secret", text: $googleSecret)
+                            .textFieldStyle(.roundedBorder)
+                        Button("Save credentials") {
+                            google.setCredentials(clientID: googleID, clientSecret: googleSecret)
+                            showGoogleSetup = false
+                        }
+                        .disabled(googleID.isEmpty)
+                    }
+                }
+            } header: { Text("Account") } footer: {
+                Text("Sign in with Google to identify yourself. Only your name and email are read — no access to Gmail, Calendar, or Drive.")
+                    .font(.caption).foregroundStyle(.secondary)
+            }
             Section {
                 SecureField("sk-...", text: $apiKeyField, onCommit: commitKey)
                     .textFieldStyle(.roundedBorder)
@@ -98,6 +154,8 @@ private struct GeneralTab: View {
         .onAppear {
             apiKeyField = settings.apiKey ?? ""
             inputDevices = AudioDevices.inputDevices()
+            googleID = google.savedClientID
+            googleSecret = google.savedClientSecret
         }
     }
 
