@@ -1,6 +1,6 @@
 cask "cursor-voice" do
-  version "0.3.0"
-  sha256 "8aec36455bc93a523cd08e4193065420547240eacb2683c87d8938d66f5fd798"
+  version "0.4.0"
+  sha256 "cf6b0dbafd2c10334f441c5dd950b535983649fa02bb4d5d567a0e85a29b08f2"
 
   url "https://github.com/tottenabderrahmane1-create/cursor-voice/releases/download/v#{version}/CursorVoice-#{version}.dmg"
   name "Cursor Voice"
