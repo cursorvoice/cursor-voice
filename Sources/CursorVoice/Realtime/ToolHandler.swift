@@ -114,7 +114,7 @@ actor ToolHandler {
         [
             "type": "function",
             "name": "batch_actions",
-            "description": "Run a sequence of input actions in ONE tool call (without taking a screenshot between each step). Use this for any multi-step automation to massively cut round-trip latency. One screenshot is auto-attached after the whole batch finishes. Supported action types: click_element, mouse_click, type_text, press_key, hotkey, scroll, sleep.",
+            "description": "Run a sequence of actions in ONE tool call (without taking a screenshot between each step). Use this for any multi-step automation to massively cut round-trip latency. One screenshot is auto-attached after the whole batch finishes. Supported action types: click_element, mouse_click, mouse_move, type_text, press_key, hotkey, scroll, sleep, run_shell, run_applescript, open_url. Each step dict needs a 'type' field plus that action's normal arguments (e.g. {\"type\":\"run_shell\",\"command\":\"...\"}).",
             "parameters": [
                 "type": "object",
                 "properties": [
@@ -923,6 +923,22 @@ actor ToolHandler {
             let seconds = number(args["seconds"]) ?? 0
             try? await Task.sleep(nanoseconds: UInt64(seconds * 1_000_000_000))
             return ["ok": true]
+        case "run_shell":
+            let cmd = (args["command"] as? String) ?? ""
+            NSLog("Batch: run_shell: \(cmd.prefix(120))")
+            return await ShellRunner.run(cmd)
+        case "run_applescript":
+            let script = (args["script"] as? String) ?? ""
+            NSLog("Batch: run_applescript: \(script.prefix(120))")
+            return AppleScriptRunner.run(script)
+        case "open_url":
+            let urlString = (args["url"] as? String) ?? ""
+            guard let url = URL(string: urlString), url.scheme != nil else {
+                return ["error": "invalid URL"]
+            }
+            NSLog("Batch: open_url: \(urlString)")
+            await MainActor.run { _ = NSWorkspace.shared.open(url) }
+            return ["ok": true, "url": urlString]
         default:
             return ["error": "unsupported batch action \"\(type)\""]
         }
