@@ -146,9 +146,10 @@ There's no Xcode project required — the codebase is plain Swift sources organi
 
 ## Support
 
-Cursor Voice is free and open source. Keeping the project online (domain, etc.) costs a little each year — if the app is useful to you, a small tip covers it and is genuinely appreciated. There's a **Sponsor** button at the top of this repo.
+Cursor Voice is free and open source.
 
-**Questions or bug reports:** open a [GitHub issue](https://github.com/cursorvoice/cursor-voice/issues) or email **support@cursorvoice.app**.
+- **Questions or bug reports:** open a [GitHub issue](https://github.com/cursorvoice/cursor-voice/issues) or email **support@cursorvoice.app**.
+- **Sponsorship or partnership:** **sponsor@cursorvoice.app** (or the **Sponsor** button at the top of this repo). Keeping the project online costs a little each year — any support is genuinely appreciated.
 
 Thank you 💜
 
