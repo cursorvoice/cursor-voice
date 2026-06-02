@@ -610,6 +610,34 @@
   </div>
 </section>
 
+<!-- ACCURACY -->
+<section id="accuracy">
+  <div class="wrap">
+    <div class="section-head reveal">
+      <div class="eyebrow">Why it lands the click</div>
+      <h2>It hits the right thing,<br>almost every time.</h2>
+      <p class="lead">Most assistants guess pixel coordinates from a screenshot and miss a lot. Cursor Voice doesn't guess — it targets real UI, and falls back through layers until something lands.</p>
+    </div>
+    <div class="grid">
+      <div class="card reveal">
+        <div class="ico"><svg viewBox="0 0 24 24"><path d="M3 3h7v7H3zM14 3h7v7h-7zM14 14h7v7h-7zM3 14h7v7H3z"/></svg></div>
+        <h3>1 · Accessibility tree</h3>
+        <p>Reads the app's real controls and fires the button's own action directly — no mouse simulation, no coordinate math. Pixel-perfect on native macOS UI.</p>
+      </div>
+      <div class="card reveal d1">
+        <div class="ico"><svg viewBox="0 0 24 24"><circle cx="11" cy="11" r="7"/><path d="M21 21l-4.3-4.3"/></svg></div>
+        <h3>2 · On-screen text</h3>
+        <p>If a target isn't in the accessibility tree, it reads the screen with the Vision framework and clicks the text — covering web pages, Electron, anything with a label.</p>
+      </div>
+      <div class="card reveal d2">
+        <div class="ico"><svg viewBox="0 0 24 24"><path d="M4 2l16 7-7 2-2 7z"/></svg></div>
+        <h3>3 · Verify &amp; retry</h3>
+        <p>After every action it takes a fresh screenshot and checks the result actually happened. If the UI didn't change, it re-locates and tries again instead of plowing ahead.</p>
+      </div>
+    </div>
+  </div>
+</section>
+
 <!-- CAPABILITIES -->
 <section id="tools">
   <div class="wrap">
