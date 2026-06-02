@@ -41,6 +41,30 @@ final class GoogleAuth: ObservableObject {
         String(bytes: bakedSecretXOR.map { $0 ^ 0x5A }, encoding: .utf8) ?? ""
     }
 
+    /// Per-device cap: at most this many distinct Google accounts may ever sign
+    /// in on a single device. A new account beyond the cap is refused.
+    static let maxAccountsPerDevice = 4
+
+    /// Stable keys (Google `sub`) of accounts that have signed in on this device.
+    private var seenAccounts: [String] {
+        get { defaults.stringArray(forKey: "deviceAccounts") ?? [] }
+        set { defaults.set(newValue, forKey: "deviceAccounts") }
+    }
+
+    /// Decide whether `id` may sign in under the per-device account cap, and
+    /// record it if so. Returns false (with a reason) when the cap is exceeded.
+    private func admit(_ id: Identity) -> Bool {
+        let key = id.sub.isEmpty ? id.email.lowercased() : id.sub
+        var seen = seenAccounts
+        if seen.contains(key) { return true }            // returning account — fine
+        if seen.count >= Self.maxAccountsPerDevice {
+            return false                                  // new account over the cap
+        }
+        seen.append(key)
+        seenAccounts = seen
+        return true
+    }
+
     private var clientID: String {
         let v = defaults.string(forKey: "googleClientID") ?? ""
         return v.isEmpty ? Self.bakedClientID : v
@@ -148,8 +172,14 @@ final class GoogleAuth: ObservableObject {
                 NSLog("GoogleAuth: token exchange failed: \(body)")
                 return
             }
-            if let refresh = obj["refresh_token"] as? String { try? refreshKeychain.write(refresh) }
             if let idToken = obj["id_token"] as? String, let id = Self.decodeIdentity(idToken) {
+                guard admit(id) else {
+                    lastError = "This device has reached its limit of \(Self.maxAccountsPerDevice) accounts."
+                    NSLog("GoogleAuth: device account cap reached — rejected \(id.email)")
+                    try? refreshKeychain.write("")
+                    return
+                }
+                if let refresh = obj["refresh_token"] as? String { try? refreshKeychain.write(refresh) }
                 identity = id
                 if let d = try? JSONEncoder().encode(id) { defaults.set(d, forKey: "googleIdentity") }
                 NSLog("GoogleAuth: signed in as \(id.email)")
