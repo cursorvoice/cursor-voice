@@ -72,6 +72,10 @@ final class WakeWordDetector {
         let req = SFSpeechAudioBufferRecognitionRequest()
         req.shouldReportPartialResults = true
         req.requiresOnDeviceRecognition = preferOnDevice
+        // Bias the recognizer toward the wake phrase + its words. This is the
+        // single biggest accuracy lever for short trigger phrases.
+        req.contextualStrings = Array(Set([phrase] + phraseTokens))
+        if #available(macOS 13, *) { req.addsPunctuation = false }
         request = req
         NSLog("WakeWord: starting (onDevice=\(preferOnDevice))")
 
@@ -127,18 +131,55 @@ final class WakeWordDetector {
         }
     }
 
-    /// Loose match: every token of the phrase appears in order somewhere in the text.
-    /// Handles "hey, cursor" vs "hey cursor" vs "hey there cursor" etc.
+    /// Fuzzy match: the phrase tokens appear in order, each allowing a small
+    /// spelling slip (homophones / mis-hearings like "curser", "cursur").
+    /// Also fires if the most distinctive token (the longest one, e.g.
+    /// "cursor") shows up near-verbatim — covers cases where the recognizer
+    /// drops the leading "hey".
     private func matches(_ text: String) -> Bool {
         guard !phraseTokens.isEmpty else { return false }
+        let words = text.split(whereSeparator: { !$0.isLetter }).map { String($0).lowercased() }
+        guard !words.isEmpty else { return false }
+
+        // In-order fuzzy sequence match.
         var idx = 0
-        for word in text.split(whereSeparator: { !$0.isLetter }) {
-            if word.lowercased() == phraseTokens[idx] {
+        for w in words {
+            if fuzzyEqual(w, phraseTokens[idx]) {
                 idx += 1
                 if idx == phraseTokens.count { return true }
             }
         }
+
+        // Fallback: the key (longest) token appears near-verbatim.
+        if let key = phraseTokens.max(by: { $0.count < $1.count }), key.count >= 5 {
+            if words.contains(where: { fuzzyEqual($0, key) }) { return true }
+        }
         return false
+    }
+
+    /// Equal allowing edit distance ≤1 for tokens of length ≥4 (else exact).
+    private func fuzzyEqual(_ a: String, _ b: String) -> Bool {
+        if a == b { return true }
+        guard b.count >= 4 else { return false }
+        return levenshtein(a, b) <= 1
+    }
+
+    private func levenshtein(_ a: String, _ b: String) -> Int {
+        let s = Array(a), t = Array(b)
+        if abs(s.count - t.count) > 1 { return 2 }   // early-out; we only care about ≤1
+        var prev = Array(0...t.count)
+        var cur = [Int](repeating: 0, count: t.count + 1)
+        for i in 1...max(1, s.count) {
+            guard i <= s.count else { break }
+            cur[0] = i
+            for j in 1...max(1, t.count) {
+                guard j <= t.count else { break }
+                let cost = s[i-1] == t[j-1] ? 0 : 1
+                cur[j] = Swift.min(prev[j] + 1, cur[j-1] + 1, prev[j-1] + cost)
+            }
+            swap(&prev, &cur)
+        }
+        return prev[t.count]
     }
 
     private func cycle() {

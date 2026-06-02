@@ -28,12 +28,27 @@ enum AudioDevices {
         else { return [] }
 
         var out: [AudioInputDevice] = []
-        for id in ids where hasInput(id) {
+        for id in ids where hasInput(id) && !isAggregate(id) {
             let uid = stringProp(id, kAudioDevicePropertyDeviceUID) ?? ""
             let name = stringProp(id, kAudioObjectPropertyName) ?? "Unknown"
-            if !uid.isEmpty { out.append(AudioInputDevice(id: id, uid: uid, name: name)) }
+            // Skip Core Audio's internal aggregate/default plumbing devices,
+            // whose names are ugly UIDs like "CADefaultDeviceAggregate-…".
+            if uid.isEmpty || name.hasPrefix("CADefaultDeviceAggregate") { continue }
+            out.append(AudioInputDevice(id: id, uid: uid, name: name))
         }
         return out
+    }
+
+    /// True for aggregate / auto-aggregate devices (system plumbing, not real mics).
+    private static func isAggregate(_ id: AudioDeviceID) -> Bool {
+        var addr = AudioObjectPropertyAddress(
+            mSelector: kAudioDevicePropertyTransportType,
+            mScope: kAudioObjectPropertyScopeGlobal,
+            mElement: kAudioObjectPropertyElementMain)
+        var t: UInt32 = 0
+        var size = UInt32(MemoryLayout<UInt32>.size)
+        guard AudioObjectGetPropertyData(id, &addr, 0, nil, &size, &t) == noErr else { return false }
+        return t == kAudioDeviceTransportTypeAggregate || t == kAudioDeviceTransportTypeAutoAggregate
     }
 
     /// Resolve a saved UID to its current AudioDeviceID (nil if unplugged).
