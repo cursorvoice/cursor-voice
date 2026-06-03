@@ -846,7 +846,11 @@ actor ToolHandler {
         case "recall":
             let q = args["query"] as? String
             let items = MemoryStore.shared.recall(matching: q)
-            let payload = items.suffix(40).map { ["content": $0.content] }
+            let payload: [[String: String]] = items.suffix(40).map {
+                var d = ["content": $0.content]
+                if let a = $0.app { d["app"] = a }
+                return d
+            }
             return ToolDispatchResult(outputJSON: encode(["count": items.count, "memories": payload]),
                                       attachedImageBase64: nil)
 

@@ -1,5 +1,6 @@
 import Foundation
 import NaturalLanguage
+import AppKit
 
 /// Persistent memory for the assistant. Stored as a JSON array at
 /// ~/Library/Application Support/CursorVoice/memory.json. The model
@@ -15,6 +16,7 @@ final class MemoryStore {
 
     struct Item: Codable, Equatable {
         let content: String
+        let app: String?     // frontmost app when remembered (nil = global / unknown)
         let timestamp: TimeInterval
     }
 
@@ -29,12 +31,13 @@ final class MemoryStore {
     func remember(_ content: String) {
         let trimmed = content.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !trimmed.isEmpty else { return }
+        let app = Self.currentApp()   // tag with the app the user is in
         queue.sync {
             // Dedup case-insensitive; refresh timestamp instead of duplicating.
             if let idx = items.firstIndex(where: { $0.content.lowercased() == trimmed.lowercased() }) {
                 items.remove(at: idx)
             }
-            items.append(Item(content: trimmed, timestamp: Date().timeIntervalSince1970))
+            items.append(Item(content: trimmed, app: app, timestamp: Date().timeIntervalSince1970))
             // Cap to last 200 items to keep the file reasonable.
             if items.count > 200 {
                 items.removeFirst(items.count - 200)
@@ -48,7 +51,8 @@ final class MemoryStore {
     /// boost for literal substring hits. Falls back to plain substring match
     /// if the embedding model isn't available.
     func recall(matching query: String?) -> [Item] {
-        queue.sync {
+        let curApp = Self.currentApp()
+        return queue.sync {
             guard let raw = query?.trimmingCharacters(in: .whitespacesAndNewlines), !raw.isEmpty else {
                 return items
             }
@@ -65,7 +69,8 @@ final class MemoryStore {
                 if let v = Self.sentenceVector(items[i].content, emb) {
                     score += Self.cosine(qv, v)
                 }
-                if score > 0.45 { scored.append((i, score)) }   // relevance threshold
+                if let a = items[i].app, a == curApp { score += 0.3 }   // same-app boost
+                if score > 0.45 { scored.append((i, score)) }           // relevance threshold
             }
             return scored.sorted { $0.score > $1.score }.prefix(25).map { items[$0.idx] }
         }
@@ -85,6 +90,12 @@ final class MemoryStore {
     }
 
     // MARK: - Semantic helpers
+
+    /// Frontmost app name to tag/boost memories by (nil for our own app).
+    private static func currentApp() -> String? {
+        guard let name = NSWorkspace.shared.frontmostApplication?.localizedName else { return nil }
+        return (name == "Cursor Voice" || name == "CursorVoice") ? nil : name
+    }
 
     /// Average word-embedding vector for a phrase (a simple sentence vector).
     private static func sentenceVector(_ text: String, _ emb: NLEmbedding) -> [Double]? {
