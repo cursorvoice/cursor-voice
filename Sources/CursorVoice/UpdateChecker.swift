@@ -51,6 +51,13 @@ final class UpdateChecker: ObservableObject {
 
     // MARK: - Check
 
+    /// Check only if we haven't checked within `gap` seconds — used for frequent
+    /// triggers (app activation) so we stay current without hammering the API.
+    func checkThrottled(_ gap: TimeInterval = 3600) async {
+        if let t = lastCheckedAt, Date().timeIntervalSince(t) < gap { return }
+        await check()
+    }
+
     func check() async {
         guard !checking else { return }
         checking = true

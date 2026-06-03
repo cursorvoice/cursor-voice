@@ -85,8 +85,13 @@ final class AppDelegate: NSObject, NSApplicationDelegate, ObservableObject {
         // Trigger system permission prompts up front so they never appear
         // mid-conversation. Non-blocking — features degrade if declined.
         Task { @MainActor in await PermissionsOnboarding.requestAll() }
-        // Check for updates on launch and periodically thereafter.
+        // Check for updates on launch and periodically thereafter (every 6h).
         UpdateChecker.shared.startPeriodicCheck()
+        // Also re-check whenever the app is brought to the front (throttled to
+        // once an hour) so it stays current without waiting on the timer.
+        NotificationCenter.default.addObserver(
+            forName: NSApplication.didBecomeActiveNotification, object: nil, queue: .main
+        ) { _ in Task { @MainActor in await UpdateChecker.shared.checkThrottled() } }
         // Not signed in → full-screen welcome / sign-in gate.
         // Signed in → the brand intro (first launch only).
         if GoogleAuth.shared.identity == nil {
