@@ -193,6 +193,26 @@ private struct AdvancedTab: View {
             } header: { Text("Realtime") }
 
             Section {
+                Toggle("Dry run — describe actions, don't perform them", isOn: Binding(
+                    get: { settings.dryRun },
+                    set: { settings.setDryRun($0) }))
+                Text(settings.dryRun
+                     ? "Dry run is ON — the assistant says what it WOULD do (click, type, run, move windows) but doesn't actually do it. Reading the screen still works. A safe way to try it out."
+                     : "When on, the assistant narrates the actions it would take instead of performing them — a safe way to see what it'll do before letting it act.")
+                    .font(.caption).foregroundStyle(settings.dryRun ? .orange : .secondary)
+
+                Picker("Spoken detail", selection: Binding(
+                    get: { settings.verbosity },
+                    set: { settings.setVerbosity($0) })) {
+                    Text("Concise").tag("concise")
+                    Text("Normal").tag("normal")
+                    Text("Detailed").tag("detailed")
+                }
+                Text("How much the assistant says back. Applies the next time you summon the orb.")
+                    .font(.caption).foregroundStyle(.secondary)
+            } header: { Text("Behavior") }
+
+            Section {
                 Toggle("Allow risky shell commands", isOn: Binding(
                     get: { settings.allowRiskyShellCommands },
                     set: { settings.setAllowRiskyShellCommands($0) }))

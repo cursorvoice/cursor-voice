@@ -184,6 +184,15 @@ final class AppCoordinator: ObservableObject {
     /// long-term memories so the model starts with that context.
     private static func buildInstructions() -> String {
         var s = baseSystemInstructions
+        // Verbosity preference (Settings → Behavior).
+        switch UserDefaults.standard.string(forKey: "verbosity") {
+        case "concise":
+            s += "\n\nVERBOSITY: Be extra terse — a word or two at most, and only when you truly must speak. Strongly prefer silence."
+        case "detailed":
+            s += "\n\nVERBOSITY: The user wants more detail — after acting, briefly explain what you did (a sentence or two) and describe what you see when it's relevant."
+        default:
+            break // "normal" — use the base instructions as-is
+        }
         let memories = MemoryStore.shared.all()
         if !memories.isEmpty {
             s += "\n\nWHAT YOU REMEMBER ABOUT THIS USER (from past sessions):\n"

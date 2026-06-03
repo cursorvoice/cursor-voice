@@ -66,6 +66,10 @@ final class SettingsStore: ObservableObject {
     @Published var inputDeviceUID: String?
     /// Opt-in: let the assistant run shell commands flagged as risky. Off by default.
     @Published var allowRiskyShellCommands: Bool
+    /// Dry run: the assistant describes the actions it WOULD take instead of performing them.
+    @Published var dryRun: Bool
+    /// Spoken-response verbosity: "concise" · "normal" · "detailed".
+    @Published var verbosity: String
 
     private let keychain = KeychainStore(service: "com.cursorvoice.app", account: "openai-api-key")
     private let defaults = UserDefaults.standard
@@ -78,6 +82,8 @@ final class SettingsStore: ObservableObject {
         self.wakeWordPhrase = defaults.string(forKey: "wakeWordPhrase") ?? "hey cursor"
         self.inputDeviceUID = defaults.string(forKey: "inputDeviceUID")
         self.allowRiskyShellCommands = defaults.bool(forKey: ShellRunner.allowRiskyKey)
+        self.dryRun = defaults.bool(forKey: "dryRun")
+        self.verbosity = defaults.string(forKey: "verbosity") ?? "normal"
 
         if let data = defaults.data(forKey: "hotkey"),
            let spec = try? JSONDecoder().decode(HotkeySpec.self, from: data) {
@@ -112,11 +118,13 @@ final class SettingsStore: ObservableObject {
     func setWakeWordEnabled(_ v: Bool) { wakeWordEnabled = v; defaults.set(v, forKey: "wakeWordEnabled") }
     func setWakeWordPhrase(_ v: String) { wakeWordPhrase = v; defaults.set(v, forKey: "wakeWordPhrase") }
     func setAllowRiskyShellCommands(_ v: Bool) { allowRiskyShellCommands = v; defaults.set(v, forKey: ShellRunner.allowRiskyKey) }
+    func setDryRun(_ v: Bool) { dryRun = v; defaults.set(v, forKey: "dryRun") }
+    func setVerbosity(_ v: String) { verbosity = v; defaults.set(v, forKey: "verbosity") }
 
     /// Wipe persisted UserDefaults + Keychain and reset published state to defaults.
     /// The app keeps running; user can re-enter the API key afterwards.
     func resetAll() {
-        for key in ["hotkey", "model", "voice", "wakeWordEnabled", "wakeWordPhrase", "inputDeviceUID", ShellRunner.allowRiskyKey] {
+        for key in ["hotkey", "model", "voice", "wakeWordEnabled", "wakeWordPhrase", "inputDeviceUID", ShellRunner.allowRiskyKey, "dryRun", "verbosity"] {
             defaults.removeObject(forKey: key)
         }
         try? keychain.write("")
@@ -128,6 +136,8 @@ final class SettingsStore: ObservableObject {
         wakeWordPhrase = "hey cursor"
         inputDeviceUID = nil
         allowRiskyShellCommands = false
+        dryRun = false
+        verbosity = "normal"
     }
 
     func openSettings() {

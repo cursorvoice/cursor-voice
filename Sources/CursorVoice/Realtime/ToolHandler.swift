@@ -527,11 +527,37 @@ actor ToolHandler {
         }
     }
 
+    /// Tools that change the Mac / the outside world — gated by dry-run mode.
+    /// Read-only tools (see_screen, list_*, find_text, web_search, recall, …)
+    /// always run so the model can still observe and plan.
+    private static let mutatingTools: Set<String> = [
+        "click_element", "click_text", "click_mark",
+        "mouse_click", "mouse_move", "mouse_drag",
+        "type_text", "press_key", "hotkey", "scroll", "batch_actions",
+        "run_shell", "run_applescript", "open_url",
+        "open_app", "activate_app", "set_window_bounds",
+        "calendar_add_event", "reminders_add", "notes_create", "mail_compose",
+        "browser_click_text", "browser_run_js"
+    ]
+
     func dispatch(name: String, argsJSON: String) async -> ToolDispatchResult {
         let args = (try? JSONSerialization.jsonObject(with: Data(argsJSON.utf8)) as? [String: Any]) ?? [:]
         let label = friendlyLabel(for: name)
         onToolStart?(label)
         defer { onToolEnd?() }
+
+        // Dry-run mode (Settings → Behavior): describe mutating actions instead
+        // of performing them. Read-only tools still run so the model can plan.
+        if UserDefaults.standard.bool(forKey: "dryRun"), Self.mutatingTools.contains(name) {
+            NSLog("Tool: [dry-run] would \(name)")
+            return ToolDispatchResult(outputJSON: encode([
+                "dry_run": true,
+                "skipped_action": name,
+                "would": label,
+                "args": args,
+                "note": "Dry-run mode is ON — this action was NOT performed. Tell the user what you would have done."
+            ]), attachedImageBase64: nil)
+        }
 
         switch name {
         case "list_ui_elements":
