@@ -169,11 +169,12 @@ final class RealtimeClient: NSObject, URLSessionWebSocketDelegate {
     }
 
     private func sendAudioChunk(_ pcm16: Data) {
-        // Half-duplex by default: while the assistant is responding, don't feed
-        // the mic to the server — otherwise speaker bleed (the model's own voice)
-        // trips the server VAD and the model interrupts/cancels itself. Users on
-        // headphones can opt into barge-in to interrupt by voice.
-        if activeResponseId != nil && !UserDefaults.standard.bool(forKey: "allowBargeIn") { return }
+        // Half-duplex by default: while the assistant is responding OR its audio
+        // is still playing (the drain after the server's "done"), don't feed the
+        // mic to the server — otherwise speaker bleed trips the VAD and the model
+        // cancels/cuts off its own reply. Headphone users can opt into barge-in.
+        if !UserDefaults.standard.bool(forKey: "allowBargeIn"),
+           activeResponseId != nil || audio.isOutputActive { return }
         let b64 = pcm16.base64EncodedString()
         send(event: ["type": "input_audio_buffer.append", "audio": b64])
     }
@@ -334,8 +335,11 @@ final class RealtimeClient: NSObject, URLSessionWebSocketDelegate {
             // Keep last completed transcript visible until next response starts.
             break
         case "input_audio_buffer.speech_started":
-            // User started talking — barge in.
-            barge()
+            // Only interrupt the assistant by voice when the user opted into
+            // barge-in. In half-duplex (default) we never cut off playback — and
+            // the mic is muted during playback anyway, so this is a safety net
+            // against any residual audio tripping the VAD.
+            if UserDefaults.standard.bool(forKey: "allowBargeIn") { barge() }
         case "input_audio_buffer.speech_stopped":
             onStateChange?(.thinking)
         case "conversation.item.input_audio_transcription.completed":

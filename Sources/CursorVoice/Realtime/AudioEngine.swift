@@ -22,6 +22,14 @@ final class AudioEngine {
 
     private(set) var isRunning = false
 
+    // Count of playback buffers queued-but-not-finished, so callers can tell when
+    // the assistant is still audibly speaking (incl. the drain after the server
+    // says the response is "done"). Used to keep the mic muted until playback
+    // truly ends — otherwise the mic catches the tail and cuts the reply off.
+    private let pendingLock = NSLock()
+    private var pendingBuffers = 0
+    var isOutputActive: Bool { pendingLock.lock(); defer { pendingLock.unlock() }; return pendingBuffers > 0 }
+
     init() {
         engine.attach(player)
         engine.attach(mixer)
@@ -106,6 +114,7 @@ final class AudioEngine {
         mixer.removeTap(onBus: 0)
         player.stop()
         engine.stop()
+        pendingLock.lock(); pendingBuffers = 0; pendingLock.unlock()
         isRunning = false
     }
 
@@ -126,13 +135,18 @@ final class AudioEngine {
                 channel[i] = Float(int16Ptr[i]) / 32768.0
             }
         }
-        player.scheduleBuffer(buffer, completionHandler: nil)
+        pendingLock.lock(); pendingBuffers += 1; pendingLock.unlock()
+        player.scheduleBuffer(buffer) { [weak self] in
+            guard let self else { return }
+            self.pendingLock.lock(); self.pendingBuffers = max(0, self.pendingBuffers - 1); self.pendingLock.unlock()
+        }
     }
 
     /// Clear queued playback (used when the model is interrupted). Drops
     /// volume to zero almost instantly, stops + flushes the player, then
     /// restores volume — gives a quick cut with no audible click.
     func cancelPlayback() {
+        pendingLock.lock(); pendingBuffers = 0; pendingLock.unlock()
         let originalVol = mixer.outputVolume
         mixer.outputVolume = 0
         player.stop()
