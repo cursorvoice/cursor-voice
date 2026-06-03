@@ -210,6 +210,12 @@ private struct AdvancedTab: View {
                 }
                 Text("How much the assistant says back. Applies the next time you summon the orb.")
                     .font(.caption).foregroundStyle(.secondary)
+
+                Toggle("Ambient context — share your active app", isOn: Binding(
+                    get: { settings.ambientContext },
+                    set: { settings.setAmbientContext($0) }))
+                Text("Tells the assistant which app is in front so you don't have to say it. App name only — your clipboard is never sent automatically (it's read only when you ask).")
+                    .font(.caption).foregroundStyle(.secondary)
             } header: { Text("Behavior") }
 
             Section {

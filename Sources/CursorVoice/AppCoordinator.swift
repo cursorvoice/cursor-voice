@@ -193,6 +193,13 @@ final class AppCoordinator: ObservableObject {
         default:
             break // "normal" — use the base instructions as-is
         }
+        // Ambient context (Settings → Behavior): tell the model the frontmost
+        // app so the user doesn't have to say it. App NAME only — never the
+        // clipboard (the model reads that on demand via read_clipboard).
+        if (UserDefaults.standard.object(forKey: "ambientContext") as? Bool ?? true),
+           let frontApp = NSWorkspace.shared.frontmostApplication?.localizedName {
+            s += "\n\nRIGHT NOW: the user's frontmost app is \(frontApp). (Ambient context — use silently, don't recite.)"
+        }
         let memories = MemoryStore.shared.all()
         if !memories.isEmpty {
             s += "\n\nWHAT YOU REMEMBER ABOUT THIS USER (from past sessions):\n"
