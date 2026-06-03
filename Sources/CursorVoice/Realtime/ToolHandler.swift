@@ -463,6 +463,54 @@ actor ToolHandler {
                 "properties": [:] as [String: Any],
                 "required": [] as [String]
             ]
+        ],
+        [
+            "type": "function",
+            "name": "read_clipboard",
+            "description": "Read the current text contents of the clipboard. Use for 'summarize what I copied', 'what's on my clipboard', etc.",
+            "parameters": [
+                "type": "object",
+                "properties": [:] as [String: Any],
+                "required": [] as [String]
+            ]
+        ],
+        [
+            "type": "function",
+            "name": "set_clipboard",
+            "description": "Replace the clipboard with the given text. For 'paste that as plain text', set the plain text here, then press_key \"v\" with modifiers [\"cmd\"].",
+            "parameters": [
+                "type": "object",
+                "properties": [
+                    "text": ["type": "string"]
+                ],
+                "required": ["text"]
+            ]
+        ],
+        [
+            "type": "function",
+            "name": "find_files",
+            "description": "Search for files/folders whose name contains a query, under a directory (default: home). Returns up to 50 matching paths.",
+            "parameters": [
+                "type": "object",
+                "properties": [
+                    "query": ["type": "string", "description": "Substring to match in file names"],
+                    "directory": ["type": "string", "description": "Optional folder to search under, e.g. ~/Downloads. Defaults to home."]
+                ],
+                "required": ["query"]
+            ]
+        ],
+        [
+            "type": "function",
+            "name": "move_file",
+            "description": "Move or rename a file/folder. If the destination is an existing folder, the item is moved into it. Paths accept ~. Won't overwrite an existing destination.",
+            "parameters": [
+                "type": "object",
+                "properties": [
+                    "from": ["type": "string", "description": "Source path"],
+                    "to": ["type": "string", "description": "Destination path or folder"]
+                ],
+                "required": ["from", "to"]
+            ]
         ]
     ]
 
@@ -523,6 +571,10 @@ actor ToolHandler {
         case "list_windows":             return "listing windows"
         case "set_window_bounds":        return "moving window"
         case "frontmost_app":            return "checking active app"
+        case "read_clipboard":           return "reading clipboard"
+        case "set_clipboard":            return "setting clipboard"
+        case "find_files":               return "finding files"
+        case "move_file":                return "moving a file"
         default:                         return tool
         }
     }
@@ -537,7 +589,8 @@ actor ToolHandler {
         "run_shell", "run_applescript", "open_url",
         "open_app", "activate_app", "set_window_bounds",
         "calendar_add_event", "reminders_add", "notes_create", "mail_compose",
-        "browser_click_text", "browser_run_js"
+        "browser_click_text", "browser_run_js",
+        "set_clipboard", "move_file"
     ]
 
     func dispatch(name: String, argsJSON: String) async -> ToolDispatchResult {
@@ -967,6 +1020,30 @@ actor ToolHandler {
 
         case "frontmost_app":
             let out = await MainActor.run { WindowManager.frontmostApp() }
+            return ToolDispatchResult(outputJSON: encode(out), attachedImageBase64: nil)
+
+        case "read_clipboard":
+            let out = await MainActor.run { ClipboardManager.read() }
+            return ToolDispatchResult(outputJSON: encode(out), attachedImageBase64: nil)
+
+        case "set_clipboard":
+            let text = (args["text"] as? String) ?? ""
+            NSLog("Tool: set_clipboard (\(text.count) chars)")
+            let out = await MainActor.run { ClipboardManager.set(text) }
+            return ToolDispatchResult(outputJSON: encode(out), attachedImageBase64: nil)
+
+        case "find_files":
+            let q = (args["query"] as? String) ?? ""
+            let dir = args["directory"] as? String
+            NSLog("Tool: find_files \"\(q)\" in \(dir ?? "~")")
+            let out = FileOps.find(query: q, in: dir)
+            return ToolDispatchResult(outputJSON: encode(out), attachedImageBase64: nil)
+
+        case "move_file":
+            let from = (args["from"] as? String) ?? ""
+            let to = (args["to"] as? String) ?? ""
+            NSLog("Tool: move_file \(from) -> \(to)")
+            let out = FileOps.move(from: from, to: to)
             return ToolDispatchResult(outputJSON: encode(out), attachedImageBase64: nil)
 
         default:
