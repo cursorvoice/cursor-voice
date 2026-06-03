@@ -76,6 +76,8 @@ final class SettingsStore: ObservableObject {
     @Published var visionAssist: Bool
     /// Hands-free: voice-only navigation — announce actions, prefer AX/keyboard.
     @Published var handsFree: Bool
+    /// How the hotkey behaves: "toggle" (press to open/close) or "pushToTalk" (hold to talk).
+    @Published var interactionMode: String
 
     private let keychain = KeychainStore(service: "com.cursorvoice.app", account: "openai-api-key")
     private let defaults = UserDefaults.standard
@@ -93,6 +95,7 @@ final class SettingsStore: ObservableObject {
         self.ambientContext = defaults.object(forKey: "ambientContext") as? Bool ?? true
         self.visionAssist = defaults.bool(forKey: "visionAssist")
         self.handsFree = defaults.bool(forKey: "handsFree")
+        self.interactionMode = defaults.string(forKey: "interactionMode") ?? "toggle"
 
         if let data = defaults.data(forKey: "hotkey"),
            let spec = try? JSONDecoder().decode(HotkeySpec.self, from: data) {
@@ -132,11 +135,12 @@ final class SettingsStore: ObservableObject {
     func setAmbientContext(_ v: Bool) { ambientContext = v; defaults.set(v, forKey: "ambientContext") }
     func setVisionAssist(_ v: Bool) { visionAssist = v; defaults.set(v, forKey: "visionAssist") }
     func setHandsFree(_ v: Bool) { handsFree = v; defaults.set(v, forKey: "handsFree") }
+    func setInteractionMode(_ v: String) { interactionMode = v; defaults.set(v, forKey: "interactionMode") }
 
     /// Wipe persisted UserDefaults + Keychain and reset published state to defaults.
     /// The app keeps running; user can re-enter the API key afterwards.
     func resetAll() {
-        for key in ["hotkey", "model", "voice", "wakeWordEnabled", "wakeWordPhrase", "inputDeviceUID", ShellRunner.allowRiskyKey, "dryRun", "verbosity", "ambientContext", "visionAssist", "handsFree"] {
+        for key in ["hotkey", "model", "voice", "wakeWordEnabled", "wakeWordPhrase", "inputDeviceUID", ShellRunner.allowRiskyKey, "dryRun", "verbosity", "ambientContext", "visionAssist", "handsFree", "interactionMode"] {
             defaults.removeObject(forKey: key)
         }
         try? keychain.write("")
@@ -153,6 +157,7 @@ final class SettingsStore: ObservableObject {
         ambientContext = true
         visionAssist = false
         handsFree = false
+        interactionMode = "toggle"
     }
 
     func openSettings() {

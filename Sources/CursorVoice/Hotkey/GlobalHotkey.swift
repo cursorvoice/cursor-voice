@@ -5,6 +5,7 @@ import Carbon.HIToolbox
 @MainActor
 final class GlobalHotkey {
     var onPress: (() -> Void)?
+    var onRelease: (() -> Void)?
 
     private var hotKeyRef: EventHotKeyRef?
     private var eventHandler: EventHandlerRef?
@@ -34,22 +35,23 @@ final class GlobalHotkey {
 
     private func installEventHandlerIfNeeded() {
         guard eventHandler == nil else { return }
-        var spec = EventTypeSpec(eventClass: OSType(kEventClassKeyboard),
-                                 eventKind: UInt32(kEventHotKeyPressed))
+        // Listen for BOTH press and release so push-to-talk (hold) works.
+        // Toggle mode just ignores the release (onRelease is a no-op there).
+        var specs = [
+            EventTypeSpec(eventClass: OSType(kEventClassKeyboard), eventKind: UInt32(kEventHotKeyPressed)),
+            EventTypeSpec(eventClass: OSType(kEventClassKeyboard), eventKind: UInt32(kEventHotKeyReleased))
+        ]
         InstallEventHandler(GetApplicationEventTarget(), { _, event, _ -> OSStatus in
-            var hkID = EventHotKeyID()
-            GetEventParameter(event,
-                              EventParamName(kEventParamDirectObject),
-                              EventParamType(typeEventHotKeyID),
-                              nil,
-                              MemoryLayout<EventHotKeyID>.size,
-                              nil,
-                              &hkID)
+            let released = GetEventKind(event) == UInt32(kEventHotKeyReleased)
             DispatchQueue.main.async {
-                NSLog("CursorVoice: hotkey fired")
-                GlobalHotkey.shared?.onPress?()
+                if released {
+                    GlobalHotkey.shared?.onRelease?()
+                } else {
+                    NSLog("CursorVoice: hotkey fired")
+                    GlobalHotkey.shared?.onPress?()
+                }
             }
             return noErr
-        }, 1, &spec, nil, &eventHandler)
+        }, 2, &specs, nil, &eventHandler)
     }
 }

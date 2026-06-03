@@ -13,6 +13,7 @@ struct SettingsView: View {
             TabView {
                 GeneralTab().tabItem { Label("General", systemImage: "gearshape") }
                 PermissionsView().tabItem { Label("Permissions", systemImage: "lock.shield") }
+                CommandsTab().tabItem { Label("Commands", systemImage: "text.bubble") }
                 AdvancedTab().tabItem { Label("Advanced", systemImage: "slider.horizontal.3") }
             }
         }
@@ -134,6 +135,15 @@ private struct GeneralTab: View {
                     }
                 }
                 Text("Press the hotkey anywhere to summon the orb at your cursor.")
+                    .font(.caption).foregroundStyle(.secondary)
+
+                Picker("Behavior", selection: Binding(
+                    get: { settings.interactionMode },
+                    set: { settings.setInteractionMode($0) })) {
+                    Text("Toggle — press to open / close").tag("toggle")
+                    Text("Push-to-talk — hold to talk").tag("pushToTalk")
+                }
+                Text("Push-to-talk: hold the hotkey while you speak, release to dismiss.")
                     .font(.caption).foregroundStyle(.secondary)
             } header: { Text("Hotkey") }
 
@@ -258,5 +268,65 @@ private struct AdvancedTab: View {
         } message: {
             Text("Clears the API key from your Keychain and resets the hotkey, voice, model, and wake-word settings.")
         }
+    }
+}
+
+/// A discoverable list of example commands — so people know what they can say.
+private struct CommandsTab: View {
+    private let groups: [(title: String, examples: [String])] = [
+        ("Apps & windows", [
+            "Open Calculator",
+            "Bring Safari to the front",
+            "What windows are open?",
+            "Move this window to the top-left, 900 by 700"
+        ]),
+        ("Click, type & scroll", [
+            "Click the Save button",
+            "Type my email address",
+            "Scroll down",
+            "Press Command-S"
+        ]),
+        ("Files & documents", [
+            "Find files named invoice in my Downloads",
+            "Rename this file to notes.txt",
+            "Read this PDF and summarize it"
+        ]),
+        ("Clipboard", [
+            "What's on my clipboard?",
+            "Summarize what I copied",
+            "Put my address on the clipboard"
+        ]),
+        ("Web & search", [
+            "Search YouTube for lo-fi beats",
+            "What's the weather in Tokyo?",
+            "Open github.com"
+        ]),
+        ("Memory", [
+            "Remember my project is at ~/Code/foo",
+            "What's my deploy command?",
+            "Forget what I told you about the API key"
+        ]),
+        ("System & screen", [
+            "What's on my screen?",
+            "What's my battery level?",
+            "What time is it in London?"
+        ])
+    ]
+
+    var body: some View {
+        Form {
+            Section {
+                Text("Press your hotkey and just say it. A few things to try:")
+                    .font(.caption).foregroundStyle(.secondary)
+            }
+            ForEach(groups.indices, id: \.self) { i in
+                Section {
+                    ForEach(groups[i].examples, id: \.self) { ex in
+                        Text("“\(ex)”").font(.callout)
+                    }
+                } header: { Text(groups[i].title) }
+            }
+        }
+        .formStyle(.grouped)
     }
 }

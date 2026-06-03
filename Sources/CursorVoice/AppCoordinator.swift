@@ -27,7 +27,17 @@ final class AppCoordinator: ObservableObject {
             self?.deactivate()
         })
 
-        hotkey.onPress = { [weak self] in self?.toggle() }
+        // Press behavior depends on the interaction mode (read live each time):
+        //  • toggle      → press opens/closes the orb; release ignored
+        //  • pushToTalk  → press opens & listens; release dismisses (hold to talk)
+        hotkey.onPress = { [weak self] in
+            guard let self else { return }
+            if self.settings.interactionMode == "pushToTalk" { self.activate() } else { self.toggle() }
+        }
+        hotkey.onRelease = { [weak self] in
+            guard let self else { return }
+            if self.settings.interactionMode == "pushToTalk" { self.deactivate() }
+        }
         applyHotkey()
 
         settings.$hotkey
