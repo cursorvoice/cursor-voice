@@ -66,9 +66,11 @@ fi
 echo "==> Copying to /Applications"
 cp -R "$MNT/${APP_NAME}.app" "$DEST"
 
-#--- strip quarantine (self-signed, not notarized — Gatekeeper blocks first run)
-echo "==> Removing quarantine attribute"
-xattr -dr com.apple.quarantine "$DEST" 2>/dev/null || true
+#--- clear extended attributes: quarantine (self-signed, not notarized — Gatekeeper
+#    blocks first run) AND com.apple.FinderInfo detritus that `cp -R` leaves on the
+#    bundle, which otherwise fails strict codesign --verify.
+echo "==> Clearing extended attributes"
+xattr -cr "$DEST" 2>/dev/null || true
 
 #--- launch ------------------------------------------------------------------
 echo "==> Done. Launching ${APP_NAME}"

@@ -196,8 +196,9 @@ final class UpdateChecker: ObservableObject {
         /bin/cp -R "$MNT/CursorVoice.app" "$APP"
         /usr/bin/hdiutil detach "$MNT" -quiet 2>/dev/null || true
 
-        # Strip Gatekeeper quarantine (we're ad-hoc signed).
-        /usr/bin/xattr -dr com.apple.quarantine "$APP" 2>/dev/null || true
+        # Clear extended attributes: quarantine (self-signed, not notarized) and the
+        # com.apple.FinderInfo detritus `cp -R` leaves, which fails strict codesign.
+        /usr/bin/xattr -cr "$APP" 2>/dev/null || true
 
         # Relaunch.
         /usr/bin/open "$APP"
