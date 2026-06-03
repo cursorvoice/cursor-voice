@@ -88,8 +88,20 @@ EOF
 echo "==> Strip extended attributes"
 /usr/bin/xattr -cr "$APP_BUNDLE"
 
-echo "==> Code sign (ad-hoc, hardened runtime)"
-codesign --force --deep --sign - \
+# Sign with a STABLE identity so the codesign "designated requirement" pins the
+# certificate (constant across builds) rather than the cdhash (changes every
+# build). macOS TCC keys mic/screen/accessibility grants on that requirement —
+# ad-hoc signing makes every update look like a new app and forces re-granting.
+# Falls back to ad-hoc if the identity isn't present (e.g. a fresh checkout).
+SIGN_IDENTITY="${CV_SIGN_IDENTITY:-Cursor Voice Signing}"
+if security find-identity -p codesigning 2>/dev/null | grep -q "$SIGN_IDENTITY"; then
+  echo "==> Code sign (stable identity: $SIGN_IDENTITY)"
+  SIGN_ARG="$SIGN_IDENTITY"
+else
+  echo "==> Code sign (ad-hoc — '$SIGN_IDENTITY' not in keychain; permissions will reset each build)"
+  SIGN_ARG="-"
+fi
+codesign --force --deep --sign "$SIGN_ARG" \
   --options runtime \
   --entitlements "$ENTITLEMENTS" \
   --timestamp=none \

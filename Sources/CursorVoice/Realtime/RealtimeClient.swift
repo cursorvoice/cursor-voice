@@ -19,6 +19,9 @@ final class RealtimeClient: NSObject, URLSessionWebSocketDelegate {
     var onInputActivity: ((Bool) -> Void)?
     var onToolStart: ((String) -> Void)?
     var onToolEnd: (() -> Void)?
+    /// Fired on every `response.done` with the API's usage payload + the model
+    /// that produced it, so the cost meter can accumulate spend.
+    var onUsage: ((_ usage: [String: Any], _ model: String) -> Void)?
 
     private var transcriptBuffer = ""
     private var pendingToolArgs: [String: String] = [:] // call_id -> json string
@@ -275,6 +278,10 @@ final class RealtimeClient: NSObject, URLSessionWebSocketDelegate {
             }
 
         case "response.done":
+            if let resp = obj["response"] as? [String: Any],
+               let usage = resp["usage"] as? [String: Any] {
+                onUsage?(usage, model)
+            }
             activeResponseId = nil
             activeAssistantItemId = nil
             emittedOutputBytes = 0

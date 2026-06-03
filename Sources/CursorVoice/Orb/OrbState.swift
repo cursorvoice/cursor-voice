@@ -19,4 +19,5 @@ final class OrbState: ObservableObject {
     @Published var lastTranscript: String = ""
     @Published var aiControlling: Bool = false  // AI is synthesizing mouse/keyboard input
     @Published var activeTool: String? = nil    // e.g. "looking at screen", "clicking"
+    @Published var sessionCost: Double = 0      // estimated USD spent this session
 }

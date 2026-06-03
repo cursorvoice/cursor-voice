@@ -118,6 +118,8 @@ final class AppCoordinator: ObservableObject {
         orbController?.present()
         cursorHalo.start()                 // halo follows cursor the whole session
         cursorHalo.active = false          // dimmed at rest, intense during input synth
+        CostMeter.shared.startSession()    // fresh cost meter per session (not per reconnect)
+        orbState.sessionCost = 0
         startRealtime(apiKey: key)
     }
 
@@ -173,6 +175,12 @@ final class AppCoordinator: ObservableObject {
         }
         client.onToolEnd = { [weak self] in
             Task { @MainActor in self?.orbState.activeTool = nil }
+        }
+        client.onUsage = { [weak self] usage, model in
+            Task { @MainActor in
+                CostMeter.shared.record(usage: usage, model: model)
+                self?.orbState.sessionCost = CostMeter.shared.sessionCost
+            }
         }
         client.connect()
         realtime = client

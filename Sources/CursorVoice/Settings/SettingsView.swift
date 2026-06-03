@@ -14,6 +14,7 @@ struct SettingsView: View {
                 GeneralTab().tabItem { Label("General", systemImage: "gearshape") }
                 PermissionsView().tabItem { Label("Permissions", systemImage: "lock.shield") }
                 CommandsTab().tabItem { Label("Commands", systemImage: "text.bubble") }
+                UsageTab().tabItem { Label("Usage", systemImage: "dollarsign.circle") }
                 AdvancedTab().tabItem { Label("Advanced", systemImage: "slider.horizontal.3") }
             }
         }
@@ -271,8 +272,60 @@ private struct AdvancedTab: View {
     }
 }
 
+/// Live spend estimate from the Realtime API's usage reports.
+private struct UsageTab: View {
+    @ObservedObject private var meter = CostMeter.shared
+    @State private var showResetConfirm = false
+
+    var body: some View {
+        Form {
+            Section {
+                LabeledContent("Estimated cost") {
+                    Text(CostMeter.short(meter.sessionCost)).fontWeight(.semibold).monospacedDigit()
+                }
+                LabeledContent("Requests") { Text("\(meter.sessionRequests)").monospacedDigit() }
+                LabeledContent("Input tokens") {
+                    Text(CostMeter.grouped(meter.sessionInputTokens)).monospacedDigit()
+                }
+                LabeledContent("Output tokens") {
+                    Text(CostMeter.grouped(meter.sessionOutputTokens)).monospacedDigit()
+                }
+            } header: { Text("This session") } footer: {
+                Text("Resets each time you summon the orb. A running estimate also appears under the orb while you talk.")
+                    .font(.caption).foregroundStyle(.secondary)
+            }
+
+            Section {
+                LabeledContent("Estimated cost") {
+                    Text(CostMeter.short(meter.lifetimeCost)).fontWeight(.semibold).monospacedDigit()
+                }
+                LabeledContent("Input tokens") {
+                    Text(CostMeter.grouped(meter.lifetimeInputTokens)).monospacedDigit()
+                }
+                LabeledContent("Output tokens") {
+                    Text(CostMeter.grouped(meter.lifetimeOutputTokens)).monospacedDigit()
+                }
+                Button("Reset totals…", role: .destructive) { showResetConfirm = true }
+            } header: { Text("All time") }
+
+            Section {
+                Text("Estimate only. Costs are computed locally from the token counts OpenAI reports, using published per-model prices — they may differ from your actual bill. Your OpenAI dashboard is authoritative. Cursor Voice never sees your spend; nothing leaves your Mac.")
+                    .font(.caption).foregroundStyle(.secondary)
+            }
+        }
+        .formStyle(.grouped)
+        .confirmationDialog("Reset usage totals?", isPresented: $showResetConfirm) {
+            Button("Reset", role: .destructive) { meter.resetLifetime() }
+            Button("Cancel", role: .cancel) {}
+        } message: {
+            Text("Clears the all-time cost and token counters. This doesn't affect your OpenAI account.")
+        }
+    }
+}
+
 /// A discoverable list of example commands — so people know what they can say.
 private struct CommandsTab: View {
+    @EnvironmentObject var settings: SettingsStore
     private let groups: [(title: String, examples: [String])] = [
         ("Apps & windows", [
             "Open Calculator",
@@ -325,6 +378,14 @@ private struct CommandsTab: View {
                         Text("“\(ex)”").font(.callout)
                     }
                 } header: { Text(groups[i].title) }
+            }
+            Section {
+                Button("Replay setup guide…") {
+                    FirstRunOnboarding.present(settings: settings)
+                }
+            } footer: {
+                Text("Re-run the guided first-launch walkthrough (permissions, hotkey, example commands).")
+                    .font(.caption).foregroundStyle(.secondary)
             }
         }
         .formStyle(.grouped)

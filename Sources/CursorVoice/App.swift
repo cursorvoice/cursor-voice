@@ -1,5 +1,6 @@
 import SwiftUI
 import AppKit
+import Combine
 
 @main
 struct CursorVoiceApp: App {
@@ -58,6 +59,7 @@ private struct MenuContent: View {
 final class AppDelegate: NSObject, NSApplicationDelegate, ObservableObject {
     let settings = SettingsStore()
     lazy var coordinator: AppCoordinator = AppCoordinator(settings: settings)
+    private var bag = Set<AnyCancellable>()
 
     func applicationDidFinishLaunching(_ notification: Notification) {
         NSApp.setActivationPolicy(.accessory)
@@ -73,7 +75,24 @@ final class AppDelegate: NSObject, NSApplicationDelegate, ObservableObject {
             SignInGate.presentIfNeeded()
         } else {
             LaunchOverlay.play()
+            // Let the brand intro finish, then run the guided first-run tour.
+            DispatchQueue.main.asyncAfter(deadline: .now() + 4.2) { [settings] in
+                FirstRunOnboarding.presentIfNeeded(settings: settings)
+            }
         }
+
+        // First sign-in on a fresh install → kick off the guided tour once the
+        // sign-in gate has dismissed.
+        GoogleAuth.shared.$identity
+            .dropFirst()
+            .receive(on: RunLoop.main)
+            .sink { [settings] id in
+                guard id != nil, !FirstRunOnboarding.hasCompleted else { return }
+                DispatchQueue.main.asyncAfter(deadline: .now() + 0.9) {
+                    FirstRunOnboarding.presentIfNeeded(settings: settings)
+                }
+            }
+            .store(in: &bag)
     }
 
     func applicationWillTerminate(_ notification: Notification) {

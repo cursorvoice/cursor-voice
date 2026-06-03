@@ -41,6 +41,11 @@ struct OrbView: View {
                     .offset(y: phase == .settled ? 0 : 4)
                     .animation(.easeOut(duration: 0.25).delay(0.12), value: phase)
 
+                if state.sessionCost > 0 && phase == .settled {
+                    costPill
+                        .transition(.opacity)
+                }
+
                 if !trimmedTranscript.isEmpty {
                     transcriptBubble
                         .transition(.opacity.combined(with: .move(edge: .top)))
@@ -139,6 +144,15 @@ struct OrbView: View {
             .shadow(color: .black.opacity(0.9), radius: 1, y: 0)
             .shadow(color: .black.opacity(0.7), radius: 3, y: 0)
             .shadow(color: .black.opacity(0.5), radius: 8, y: 1)
+    }
+
+    /// Tiny running spend estimate for this session.
+    private var costPill: some View {
+        Text("~\(CostMeter.short(state.sessionCost)) this session")
+            .font(.system(size: 9.5, weight: .medium, design: .rounded))
+            .foregroundStyle(.white.opacity(0.6))
+            .shadow(color: .black.opacity(0.8), radius: 2, y: 0)
+            .shadow(color: .black.opacity(0.5), radius: 6, y: 1)
     }
 
     private var isErrorState: Bool {
