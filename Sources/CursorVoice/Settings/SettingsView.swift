@@ -14,6 +14,7 @@ struct SettingsView: View {
                 GeneralTab().tabItem { Label("General", systemImage: "gearshape") }
                 PermissionsView().tabItem { Label("Permissions", systemImage: "lock.shield") }
                 CommandsTab().tabItem { Label("Commands", systemImage: "text.bubble") }
+                PluginsTab().tabItem { Label("Plugins", systemImage: "puzzlepiece.extension") }
                 UsageTab().tabItem { Label("Usage", systemImage: "dollarsign.circle") }
                 AdvancedTab().tabItem { Label("Advanced", systemImage: "slider.horizontal.3") }
             }
@@ -374,6 +375,109 @@ private struct UsageTab: View {
             budgetField = ""
         }
     }
+}
+
+/// Installed community plugins + links to browse / submit on the marketplace.
+private struct PluginsTab: View {
+    @State private var plugins: [PluginManager.Tool] = []
+    @State private var pendingDelete: PluginManager.Tool?
+
+    private static let marketplace = "https://community.cursorvoice.app"
+    private static let submit = "https://community.cursorvoice.app/submit.html"
+
+    var body: some View {
+        Form {
+            Section {
+                if plugins.isEmpty {
+                    VStack(spacing: 10) {
+                        Image(systemName: "puzzlepiece.extension")
+                            .font(.system(size: 32)).foregroundStyle(.tertiary)
+                        Text("No plugins installed yet")
+                            .font(.callout).fontWeight(.medium)
+                        Text("Plugins add new voice commands — search the web, control an app, open a tool. Browse the marketplace to install one.")
+                            .font(.caption).foregroundStyle(.secondary)
+                            .multilineTextAlignment(.center).fixedSize(horizontal: false, vertical: true)
+                        Button("Browse the marketplace") { open(Self.marketplace) }
+                            .buttonStyle(.borderedProminent).padding(.top, 4)
+                    }
+                    .frame(maxWidth: .infinity).padding(.vertical, 14)
+                } else {
+                    ForEach(plugins, id: \.name) { p in
+                        HStack(spacing: 12) {
+                            Image(systemName: icon(p.runType))
+                                .font(.system(size: 16)).foregroundStyle(.tint).frame(width: 22)
+                            VStack(alignment: .leading, spacing: 2) {
+                                Text(friendly(p.name)).fontWeight(.medium)
+                                Text(p.description).font(.caption).foregroundStyle(.secondary)
+                                    .lineLimit(2).fixedSize(horizontal: false, vertical: true)
+                            }
+                            Spacer()
+                            Text(badge(p.runType))
+                                .font(.system(size: 10, weight: .semibold, design: .monospaced))
+                                .padding(.horizontal, 7).padding(.vertical, 3)
+                                .background(Capsule().fill(Color.secondary.opacity(0.15)))
+                                .foregroundStyle(.secondary)
+                            Button {
+                                pendingDelete = p
+                            } label: { Image(systemName: "trash") }
+                                .buttonStyle(.borderless).foregroundStyle(.secondary)
+                                .help("Remove this plugin")
+                        }
+                        .padding(.vertical, 3)
+                    }
+                }
+            } header: {
+                HStack {
+                    Text("Installed")
+                    Spacer()
+                    Button { reload() } label: { Image(systemName: "arrow.clockwise") }
+                        .buttonStyle(.borderless).font(.caption).help("Refresh")
+                }
+            } footer: {
+                Button("Show plugins folder in Finder") {
+                    NSWorkspace.shared.open(PluginManager.pluginsDir())
+                }.buttonStyle(.borderless).font(.caption)
+            }
+
+            Section {
+                Button {
+                    open(Self.marketplace)
+                } label: {
+                    Label("Browse & install plugins", systemImage: "square.grid.2x2")
+                }
+                Button {
+                    open(Self.submit)
+                } label: {
+                    Label("Submit your own plugin", systemImage: "square.and.arrow.up")
+                }
+            } header: { Text("Marketplace") } footer: {
+                Text("Community plugins live at community.cursorvoice.app. Install with one click, or share your own — safe ones are published automatically.")
+                    .font(.caption).foregroundStyle(.secondary)
+            }
+        }
+        .formStyle(.grouped)
+        .onAppear { reload() }
+        .confirmationDialog("Remove “\(pendingDelete.map { friendly($0.name) } ?? "")”?",
+                            isPresented: Binding(get: { pendingDelete != nil },
+                                                 set: { if !$0 { pendingDelete = nil } })) {
+            Button("Remove", role: .destructive) {
+                if let f = pendingDelete?.file { try? FileManager.default.removeItem(at: f) }
+                pendingDelete = nil
+                reload()
+            }
+            Button("Cancel", role: .cancel) { pendingDelete = nil }
+        } message: {
+            Text("Deletes the plugin file. You can always reinstall it from the marketplace.")
+        }
+    }
+
+    private func reload() { plugins = PluginManager.load().sorted { friendly($0.name) < friendly($1.name) } }
+    private func open(_ s: String) { if let u = URL(string: s) { NSWorkspace.shared.open(u) } }
+    private func friendly(_ n: String) -> String {
+        n.replacingOccurrences(of: "plugin_", with: "").replacingOccurrences(of: "_", with: " ").capitalized
+    }
+    private func badge(_ t: String) -> String { ["open_url": "URL", "shell": "SHELL", "applescript": "SCRIPT"][t] ?? t.uppercased() }
+    private func icon(_ t: String) -> String { ["open_url": "link", "shell": "terminal", "applescript": "applescript"][t] ?? "puzzlepiece" }
 }
 
 /// A discoverable list of example commands — so people know what they can say.

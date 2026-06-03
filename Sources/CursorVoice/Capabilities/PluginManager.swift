@@ -24,6 +24,7 @@ enum PluginManager {
         let parameters: [String: Any]
         let runType: String       // "shell" | "applescript" | "open_url"
         let template: String
+        var file: URL? = nil      // source manifest (for the Settings → Plugins UI)
     }
 
     static func pluginsDir() -> URL {
@@ -56,7 +57,7 @@ enum PluginManager {
             let params = (obj["parameters"] as? [String: Any])
                 ?? ["type": "object", "properties": [:] as [String: Any]]
             tools.append(Tool(name: "plugin_\(sanitized)", description: desc,
-                              parameters: params, runType: runType, template: template))
+                              parameters: params, runType: runType, template: template, file: f))
         }
         return tools
     }
