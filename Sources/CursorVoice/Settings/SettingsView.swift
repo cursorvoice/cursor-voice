@@ -21,6 +21,10 @@ struct SettingsView: View {
         }
         .frame(width: 500, height: 460)
         .onAppear {
+            // Re-check for updates whenever Settings opens — the menu-bar app's
+            // periodic check (launch + every 6h) can miss a release published
+            // while it's been running, so this makes the banner reliably appear.
+            Task { await UpdateChecker.shared.check() }
             // Accessory (menu-bar) apps open windows behind whatever's frontmost.
             // Force the app + its settings window to the front.
             NSApp.activate(ignoringOtherApps: true)
