@@ -73,6 +73,21 @@ final class AppCoordinator: ObservableObject {
             Task { @MainActor in self?.activate() }
         }
 
+        // When the Mac sleeps, the audio device/route gets torn out from under a
+        // live session, which made it spin (the model repeating "ok…"). Close the
+        // session cleanly on sleep; the user re-summons on wake.
+        NSWorkspace.shared.notificationCenter.addObserver(
+            forName: NSWorkspace.willSleepNotification, object: nil, queue: .main
+        ) { [weak self] _ in
+            guard let self else { return }
+            Task { @MainActor in
+                if self.orbState.isVisible {
+                    NSLog("Coordinator: system sleeping — closing active session")
+                    self.deactivate()
+                }
+            }
+        }
+
         // NOTE: MCP connections are deferred for now (code retained in
         // MCPClient/MCPManager for a later release). Not connected at startup.
     }

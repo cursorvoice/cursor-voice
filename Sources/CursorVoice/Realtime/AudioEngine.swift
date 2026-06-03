@@ -29,17 +29,26 @@ final class AudioEngine {
 
     func start() throws {
         guard !isRunning else { return }
-        let input = engine.inputNode
-        // Acoustic echo cancellation + noise suppression via Apple's voice-processing
-        // I/O. Without this, on built-in speakers the mic hears the assistant's own
-        // voice and the server VAD treats it as the user talking → constant
-        // self-interruption and spurious cancels. Must be enabled before start().
+        // Try with acoustic echo cancellation (voice-processing I/O) first — it
+        // stops the mic hearing the assistant through the speakers. But VPIO
+        // fails to initialize on some setups (external/USB mics, Mac mini, etc.)
+        // with errors like -10875, so fall back to a plain engine if it throws.
         do {
-            try input.setVoiceProcessingEnabled(true)
-            NSLog("AudioEngine: voice processing (AEC + noise suppression) enabled")
+            try configureAndStart(useVoiceProcessing: true)
+            NSLog("AudioEngine: started with echo cancellation")
         } catch {
-            NSLog("AudioEngine: voice processing unavailable (\(error)) — continuing without AEC")
+            NSLog("AudioEngine: AEC start failed (\((error as NSError).code)) — retrying without it")
+            cleanupNodes()
+            try configureAndStart(useVoiceProcessing: false)
+            NSLog("AudioEngine: started without echo cancellation")
         }
+        isRunning = true
+    }
+
+    private func configureAndStart(useVoiceProcessing: Bool) throws {
+        let input = engine.inputNode
+        try? input.setVoiceProcessingEnabled(useVoiceProcessing)
+
         applyPreferredInputDevice()
         let inputFormat = input.outputFormat(forBus: 0)
         let targetFormat = AVAudioFormat(commonFormat: .pcmFormatInt16,
@@ -64,7 +73,13 @@ final class AudioEngine {
         engine.prepare()
         try engine.start()
         player.play()
-        isRunning = true
+    }
+
+    /// Undo taps/engine state so we can retry configuration cleanly.
+    private func cleanupNodes() {
+        engine.inputNode.removeTap(onBus: 0)
+        mixer.removeTap(onBus: 0)
+        if engine.isRunning { engine.stop() }
     }
 
     /// Point the engine's input node at the user-selected Core Audio device.
