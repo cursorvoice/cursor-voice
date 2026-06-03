@@ -1046,6 +1046,7 @@ actor ToolHandler {
 
         case "read_clipboard":
             let out = await MainActor.run { ClipboardManager.read() }
+            NSLog("Tool: read_clipboard -> len=\(out["length"] ?? 0) types=\(out["available_types"] ?? "ok")")
             return ToolDispatchResult(outputJSON: encode(out), attachedImageBase64: nil)
 
         case "set_clipboard":
