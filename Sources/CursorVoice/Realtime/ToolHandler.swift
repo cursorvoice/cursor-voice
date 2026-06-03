@@ -511,6 +511,26 @@ actor ToolHandler {
                 ],
                 "required": ["from", "to"]
             ]
+        ],
+        [
+            "type": "function",
+            "name": "read_pdf",
+            "description": "Extract and return the text of a PDF file (path accepts ~). Use to answer questions about a PDF. Returns page count + text (truncated if long). Scanned/image-only PDFs return no text.",
+            "parameters": [
+                "type": "object",
+                "properties": [ "path": ["type": "string"] ],
+                "required": ["path"]
+            ]
+        ],
+        [
+            "type": "function",
+            "name": "read_file",
+            "description": "Read the text contents of a file (code, markdown, txt, json, etc.; path accepts ~). Refuses binaries and files over ~5MB. Returns text (truncated if long).",
+            "parameters": [
+                "type": "object",
+                "properties": [ "path": ["type": "string"] ],
+                "required": ["path"]
+            ]
         ]
     ]
 
@@ -575,6 +595,8 @@ actor ToolHandler {
         case "set_clipboard":            return "setting clipboard"
         case "find_files":               return "finding files"
         case "move_file":                return "moving a file"
+        case "read_pdf":                 return "reading a PDF"
+        case "read_file":                return "reading a file"
         default:                         return tool
         }
     }
@@ -1045,6 +1067,16 @@ actor ToolHandler {
             NSLog("Tool: move_file \(from) -> \(to)")
             let out = FileOps.move(from: from, to: to)
             return ToolDispatchResult(outputJSON: encode(out), attachedImageBase64: nil)
+
+        case "read_pdf":
+            let path = (args["path"] as? String) ?? ""
+            NSLog("Tool: read_pdf \(path)")
+            return ToolDispatchResult(outputJSON: encode(DocReader.readPDF(path: path)), attachedImageBase64: nil)
+
+        case "read_file":
+            let path = (args["path"] as? String) ?? ""
+            NSLog("Tool: read_file \(path)")
+            return ToolDispatchResult(outputJSON: encode(DocReader.readFile(path: path)), attachedImageBase64: nil)
 
         default:
             return ToolDispatchResult(outputJSON: encode(["error": "unknown tool \(name)"]),
