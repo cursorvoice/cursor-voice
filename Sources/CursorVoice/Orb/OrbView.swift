@@ -4,6 +4,7 @@ import SwiftUI
 /// Inspired by ChatGPT voice mode + Apple Intelligence aesthetic. Compact, calm.
 struct OrbView: View {
     @ObservedObject var state: OrbState
+    @ObservedObject private var meter = CostMeter.shared
     var onDismiss: () -> Void
 
     @State private var phase: Phase = .hidden
@@ -41,7 +42,7 @@ struct OrbView: View {
                     .offset(y: phase == .settled ? 0 : 4)
                     .animation(.easeOut(duration: 0.25).delay(0.12), value: phase)
 
-                if state.sessionCost > 0 && phase == .settled {
+                if (state.sessionCost > 0 || meter.hasBudget) && phase == .settled {
                     costPill
                         .transition(.opacity)
                 }
@@ -146,13 +147,28 @@ struct OrbView: View {
             .shadow(color: .black.opacity(0.5), radius: 8, y: 1)
     }
 
-    /// Tiny running spend estimate for this session.
+    /// Tiny running spend estimate for this session — plus credit remaining if
+    /// the user has set a budget.
     private var costPill: some View {
-        Text("~\(CostMeter.short(state.sessionCost)) this session")
-            .font(.system(size: 9.5, weight: .medium, design: .rounded))
-            .foregroundStyle(.white.opacity(0.6))
-            .shadow(color: .black.opacity(0.8), radius: 2, y: 0)
-            .shadow(color: .black.opacity(0.5), radius: 6, y: 1)
+        HStack(spacing: 5) {
+            Text("~\(CostMeter.short(state.sessionCost)) this session")
+                .foregroundStyle(.white.opacity(0.6))
+            if meter.hasBudget {
+                Text("·").foregroundStyle(.white.opacity(0.35))
+                Text("\(CostMeter.short(meter.budgetRemaining)) left")
+                    .foregroundStyle(remainingTint)
+            }
+        }
+        .font(.system(size: 9.5, weight: .medium, design: .rounded))
+        .shadow(color: .black.opacity(0.8), radius: 2, y: 0)
+        .shadow(color: .black.opacity(0.5), radius: 6, y: 1)
+    }
+
+    private var remainingTint: Color {
+        let f = meter.budgetFraction
+        if f <= 0.1 { return Color(red: 1, green: 0.5, blue: 0.5) }
+        if f <= 0.25 { return Color(red: 1, green: 0.78, blue: 0.4) }
+        return .white.opacity(0.6)
     }
 
     private var isErrorState: Bool {
@@ -197,6 +213,11 @@ struct OrbView: View {
     /// Strip URLs and trailing diagnostic chatter from API errors so the pill
     /// shows the useful human-readable bit ("You exceeded your current quota…").
     private static func shortenError(_ raw: String) -> String {
+        let low = raw.lowercased()
+        if low.contains("insufficient_quota") || low.contains("exceeded your current quota")
+            || low.contains("billing") || (low.contains("quota") && low.contains("exceed")) {
+            return "Out of OpenAI credit — add funds at platform.openai.com/billing"
+        }
         var s = raw
         // Drop "For more information…" tail and any URL.
         if let r = s.range(of: " For more information") { s = String(s[..<r.lowerBound]) }

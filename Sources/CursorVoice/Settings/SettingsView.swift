@@ -276,9 +276,48 @@ private struct AdvancedTab: View {
 private struct UsageTab: View {
     @ObservedObject private var meter = CostMeter.shared
     @State private var showResetConfirm = false
+    @State private var budgetField = ""
 
     var body: some View {
         Form {
+            Section {
+                if meter.hasBudget {
+                    LabeledContent("Credit remaining") {
+                        Text(CostMeter.short(meter.budgetRemaining))
+                            .fontWeight(.bold).monospacedDigit()
+                            .foregroundStyle(remainingColor)
+                    }
+                    ProgressView(value: meter.budgetFraction)
+                        .tint(remainingColor)
+                    LabeledContent("Used since set") {
+                        Text(CostMeter.short(meter.budgetSpent)).monospacedDigit()
+                    }
+                    LabeledContent("Budget") {
+                        Text(CostMeter.short(meter.budget)).monospacedDigit().foregroundStyle(.secondary)
+                    }
+                    HStack {
+                        TextField("New amount", text: $budgetField)
+                            .textFieldStyle(.roundedBorder).frame(width: 110)
+                        Button("Update") { commitBudget() }.disabled(Double(budgetField) == nil)
+                        Spacer()
+                        Button("Clear", role: .destructive) { meter.clearBudget(); budgetField = "" }
+                    }
+                } else {
+                    Text("OpenAI doesn't share your live balance with an API key. Enter the credit you loaded and Cursor Voice will track what's left as you use it.")
+                        .font(.caption).foregroundStyle(.secondary)
+                    HStack {
+                        Text("$")
+                        TextField("e.g. 10.00", text: $budgetField)
+                            .textFieldStyle(.roundedBorder).frame(width: 120)
+                        Button("Set budget") { commitBudget() }
+                            .disabled(Double(budgetField) == nil)
+                    }
+                }
+            } header: { Text("Credit budget") } footer: {
+                Text("An estimate based on local token counts — top up or verify the real balance at platform.openai.com/account/billing.")
+                    .font(.caption).foregroundStyle(.secondary)
+            }
+
             Section {
                 LabeledContent("Estimated cost") {
                     Text(CostMeter.short(meter.sessionCost)).fontWeight(.semibold).monospacedDigit()
@@ -319,6 +358,20 @@ private struct UsageTab: View {
             Button("Cancel", role: .cancel) {}
         } message: {
             Text("Clears the all-time cost and token counters. This doesn't affect your OpenAI account.")
+        }
+    }
+
+    private var remainingColor: Color {
+        let f = meter.budgetFraction
+        if f <= 0.1 { return .red }
+        if f <= 0.25 { return .orange }
+        return .green
+    }
+
+    private func commitBudget() {
+        if let amount = Double(budgetField.trimmingCharacters(in: .whitespaces)) {
+            meter.setBudget(amount)
+            budgetField = ""
         }
     }
 }

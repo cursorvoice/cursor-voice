@@ -24,15 +24,48 @@ final class CostMeter: ObservableObject {
     @Published private(set) var lifetimeInputTokens: Int = 0
     @Published private(set) var lifetimeOutputTokens: Int = 0
 
+    // Optional self-reported credit budget. OpenAI doesn't expose remaining
+    // balance via API keys, so the user enters the credit they loaded and we
+    // subtract estimated spend from the moment it was set.
+    @Published private(set) var budget: Double = 0          // 0 = no budget set
+    private var budgetBaseline: Double = 0                  // lifetimeCost when budget was set
+
     private let defaults = UserDefaults.standard
     private let kCost = "usage.lifetimeCost"
     private let kIn = "usage.lifetimeInputTokens"
     private let kOut = "usage.lifetimeOutputTokens"
+    private let kBudget = "usage.budget"
+    private let kBudgetBaseline = "usage.budgetBaseline"
 
     private init() {
         lifetimeCost = defaults.double(forKey: kCost)
         lifetimeInputTokens = defaults.integer(forKey: kIn)
         lifetimeOutputTokens = defaults.integer(forKey: kOut)
+        budget = defaults.double(forKey: kBudget)
+        budgetBaseline = defaults.double(forKey: kBudgetBaseline)
+    }
+
+    var hasBudget: Bool { budget > 0 }
+    /// Estimated spend since the budget was set.
+    var budgetSpent: Double { max(0, lifetimeCost - budgetBaseline) }
+    /// Estimated credit remaining.
+    var budgetRemaining: Double { max(0, budget - budgetSpent) }
+    /// Fraction of budget left (0...1); 1 when no budget.
+    var budgetFraction: Double { hasBudget ? budgetRemaining / budget : 1 }
+
+    /// Set the loaded credit amount; counts only spend from now forward.
+    func setBudget(_ amount: Double) {
+        budget = max(0, amount)
+        budgetBaseline = lifetimeCost
+        defaults.set(budget, forKey: kBudget)
+        defaults.set(budgetBaseline, forKey: kBudgetBaseline)
+    }
+
+    func clearBudget() {
+        budget = 0
+        budgetBaseline = 0
+        defaults.removeObject(forKey: kBudget)
+        defaults.removeObject(forKey: kBudgetBaseline)
     }
 
     /// Per-1M-token pricing. text/audio split because Realtime audio tokens cost
@@ -119,9 +152,11 @@ final class CostMeter: ObservableObject {
         lifetimeCost = 0
         lifetimeInputTokens = 0
         lifetimeOutputTokens = 0
+        budgetBaseline = 0
         defaults.removeObject(forKey: kCost)
         defaults.removeObject(forKey: kIn)
         defaults.removeObject(forKey: kOut)
+        defaults.set(0.0, forKey: kBudgetBaseline)
     }
 
     private static func intVal(_ any: Any?) -> Int {
