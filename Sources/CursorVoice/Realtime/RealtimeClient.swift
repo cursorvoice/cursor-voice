@@ -140,20 +140,20 @@ final class RealtimeClient: NSObject, URLSessionWebSocketDelegate {
             "audio": [
                 "input": [
                     "format": ["type": "audio/pcm", "rate": 24000],
-                    // server_vad is more responsive for interruption (volume-based)
-                    // than semantic_vad (content-based, can ignore quick barge-ins).
-                    // threshold MUST be a value exactly representable in IEEE-754
-                    // (otherwise JSONSerialization sends 17 decimal places and the
-                    // server rejects the entire session.update). 0.5 is exact.
                     // threshold MUST be exactly representable in IEEE-754 (0.625 = 5/8
                     // is exact) so JSONSerialization doesn't emit a 17-digit float the
                     // server rejects. Raised from 0.5 + longer silence window to cut
                     // false triggers from ambient noise and speaker bleed.
+                    // create_response:false → the server detects turns but does NOT
+                    // auto-respond. We respond ourselves only after a real transcript
+                    // arrives, so room noise / speaker bleep (which transcribes to
+                    // nothing) can't make the model spew filler ("ok ok ok…").
                     "turn_detection": [
                         "type": "server_vad",
                         "threshold": 0.625,
                         "prefix_padding_ms": 300,
-                        "silence_duration_ms": 600
+                        "silence_duration_ms": 600,
+                        "create_response": false
                     ],
                     "transcription": ["model": "whisper-1"]
                 ],
@@ -266,6 +266,22 @@ final class RealtimeClient: NSObject, URLSessionWebSocketDelegate {
         }
     }
 
+    /// True only if a transcript looks like a real command — not silence, not a
+    /// Whisper hallucination (it emits "you", "thank you", "thanks for watching"
+    /// and similar on quiet/noisy input), and not a bare acknowledgement.
+    private static func isMeaningfulSpeech(_ raw: String) -> Bool {
+        let norm = raw.lowercased()
+            .trimmingCharacters(in: .whitespacesAndNewlines)
+            .trimmingCharacters(in: CharacterSet(charactersIn: ".,!?…\"' "))
+        if norm.count < 2 { return false }
+        let noise: Set<String> = [
+            "you", "thank you", "thanks", "thanks for watching", "thank you for watching",
+            "bye", "okay", "ok", "uh", "um", "hmm", "mm", "mhm", "yeah", "so",
+            "the", "i", "a", "please subscribe", "subscribe"
+        ]
+        return !noise.contains(norm)
+    }
+
     private func handle(string: String) {
         guard let data = string.data(using: .utf8),
               let obj = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
@@ -322,6 +338,20 @@ final class RealtimeClient: NSObject, URLSessionWebSocketDelegate {
             barge()
         case "input_audio_buffer.speech_stopped":
             onStateChange?(.thinking)
+        case "conversation.item.input_audio_transcription.completed":
+            // We hold response creation (create_response:false) until we see a
+            // real transcript — this is what stops the "ok ok ok" loop when the
+            // mic only hears noise/silence.
+            let transcript = (obj["transcript"] as? String) ?? ""
+            if Self.isMeaningfulSpeech(transcript) {
+                NSLog("Realtime: user said \"\(transcript)\" → responding")
+                send(event: ["type": "response.create"])
+            } else {
+                NSLog("Realtime: ignoring empty/noise turn \"\(transcript)\"")
+                onStateChange?(.listening)
+            }
+        case "conversation.item.input_audio_transcription.failed":
+            onStateChange?(.listening)
         case "response.function_call_arguments.delta":
             if let callId = obj["call_id"] as? String, let delta = obj["delta"] as? String {
                 pendingToolArgs[callId, default: ""] += delta
