@@ -35,8 +35,12 @@ Downloads the latest release, copies the app into `/Applications`, strips the qu
 ### Homebrew
 
 ```bash
+# Install
 brew tap cursorvoice/cursor-voice
 brew install --cask cursor-voice
+
+# Update to the latest release
+brew upgrade --cask cursor-voice
 ```
 
 The cask's `postflight` strips quarantine automatically — no right-click-Open dance.
@@ -45,7 +49,7 @@ The cask's `postflight` strips quarantine automatically — no right-click-Open 
 
 1. Download the DMG from the [latest release](https://github.com/cursorvoice/cursor-voice/releases/latest).
 2. Open it, drag **Cursor Voice** into Applications.
-3. **First launch**: macOS Gatekeeper will refuse to open it (it's ad-hoc signed, no paid Developer ID). Fix with one of:
+3. **First launch**: macOS Gatekeeper will refuse to open it (it's self-signed, not notarized — no paid Developer ID). Fix with one of:
    - **Right-click the app → Open** → confirm in the dialog.
    - Or: `xattr -dr com.apple.quarantine /Applications/CursorVoice.app && open /Applications/CursorVoice.app`
 
