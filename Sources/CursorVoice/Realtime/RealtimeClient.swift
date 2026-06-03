@@ -24,6 +24,7 @@ final class RealtimeClient: NSObject, URLSessionWebSocketDelegate {
     var onUsage: ((_ usage: [String: Any], _ model: String) -> Void)?
 
     private var transcriptBuffer = ""
+    private var recentInputPeak: Float = 0   // decaying peak input level (0…1)
     private var pendingToolArgs: [String: String] = [:] // call_id -> json string
     private var lastServerError: String?
 
@@ -42,7 +43,13 @@ final class RealtimeClient: NSObject, URLSessionWebSocketDelegate {
 
         audio.preferredInputUID = inputDeviceUID
         audio.onInputChunk = { [weak self] data in self?.sendAudioChunk(data) }
-        audio.onInputLevel = { [weak self] level in self?.onAudioLevel?(level) }
+        audio.onInputLevel = { [weak self] level in
+            guard let self else { return }
+            // Decaying peak of recent input loudness — used to tell a real (loud,
+            // close) interruption from quieter speaker echo when deciding to barge.
+            self.recentInputPeak = max(level, self.recentInputPeak * 0.85)
+            self.onAudioLevel?(level)
+        }
         audio.onOutputLevel = { _ in }
 
         // Hook tool activity (for the cursor halo) — forward into the client's callback.
@@ -173,8 +180,8 @@ final class RealtimeClient: NSObject, URLSessionWebSocketDelegate {
         // is still playing (the drain after the server's "done"), don't feed the
         // mic to the server — otherwise speaker bleed trips the VAD and the model
         // cancels/cuts off its own reply. Headphone users can opt into barge-in.
-        if !UserDefaults.standard.bool(forKey: "allowBargeIn"),
-           activeResponseId != nil || audio.isOutputActive { return }
+        let bargeIn = UserDefaults.standard.object(forKey: "allowBargeIn") as? Bool ?? true
+        if !bargeIn, activeResponseId != nil || audio.isOutputActive { return }
         let b64 = pcm16.base64EncodedString()
         send(event: ["type": "input_audio_buffer.append", "audio": b64])
     }
@@ -335,11 +342,18 @@ final class RealtimeClient: NSObject, URLSessionWebSocketDelegate {
             // Keep last completed transcript visible until next response starts.
             break
         case "input_audio_buffer.speech_started":
-            // Only interrupt the assistant by voice when the user opted into
-            // barge-in. In half-duplex (default) we never cut off playback — and
-            // the mic is muted during playback anyway, so this is a safety net
-            // against any residual audio tripping the VAD.
-            if UserDefaults.standard.bool(forKey: "allowBargeIn") { barge() }
+            // Interruption (barge-in). When it's off, the mic is muted during
+            // playback so this won't fire from our own audio. When it's on, the
+            // mic stays open so you CAN cut the assistant off — but while it's
+            // audibly speaking we require clearly-loud input (a real, close voice)
+            // so quieter speaker echo doesn't make it interrupt itself.
+            let bargeIn = UserDefaults.standard.object(forKey: "allowBargeIn") as? Bool ?? true
+            guard bargeIn else { break }
+            if audio.isOutputActive && recentInputPeak < 0.42 {
+                NSLog("Realtime: ignoring likely echo (peak \(String(format: "%.2f", recentInputPeak)))")
+                break
+            }
+            barge()
         case "input_audio_buffer.speech_stopped":
             onStateChange?(.thinking)
         case "conversation.item.input_audio_transcription.completed":

@@ -237,9 +237,9 @@ private struct AdvancedTab: View {
                     get: { settings.allowBargeIn },
                     set: { settings.setAllowBargeIn($0) }))
                 Text(settings.allowBargeIn
-                     ? "⚠️ Barge-in is ON — you can cut the assistant off by speaking. On built-in speakers the mic may hear the assistant and interrupt it mid-reply. Use headphones for best results."
-                     : "Off: the assistant finishes speaking before listening again, so it won't interrupt itself on speakers. Turn on (with headphones) to cut it off by voice.")
-                    .font(.caption).foregroundStyle(settings.allowBargeIn ? .orange : .secondary)
+                     ? "On: start talking and the assistant stops to listen. It only interrupts for clearly-spoken input, so quiet speaker echo won't make it cut itself off — but headphones still give the cleanest results."
+                     : "Off: the assistant always finishes speaking before it listens again. It can't be interrupted by voice (use the hotkey to stop it).")
+                    .font(.caption).foregroundStyle(.secondary)
             } header: { Text("Behavior") }
 
             Section {

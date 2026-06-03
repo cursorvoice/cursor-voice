@@ -100,7 +100,7 @@ final class SettingsStore: ObservableObject {
         self.visionAssist = defaults.bool(forKey: "visionAssist")
         self.handsFree = defaults.bool(forKey: "handsFree")
         self.interactionMode = defaults.string(forKey: "interactionMode") ?? "toggle"
-        self.allowBargeIn = defaults.bool(forKey: "allowBargeIn")
+        self.allowBargeIn = defaults.object(forKey: "allowBargeIn") as? Bool ?? true
 
         if let data = defaults.data(forKey: "hotkey"),
            let spec = try? JSONDecoder().decode(HotkeySpec.self, from: data) {
@@ -164,7 +164,7 @@ final class SettingsStore: ObservableObject {
         visionAssist = false
         handsFree = false
         interactionMode = "toggle"
-        allowBargeIn = false
+        allowBargeIn = true
     }
 
     func openSettings() {
