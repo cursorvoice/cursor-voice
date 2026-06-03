@@ -61,29 +61,38 @@ final class ScreenCapture {
             let cg = try await SCScreenshotManager.captureImage(contentFilter: filter,
                                                                 configuration: cfg)
 
-            guard let jpeg = jpegEncode(cg, quality: 0.72) else {
+            // Capture is at native resolution, but shipping that to the model
+            // on every action is slow and very token-expensive. Downscale the
+            // long edge to a cap and use the SAME downscaled image for the model
+            // JPEG *and* OCR, so model clicks and OCR bboxes stay in one
+            // coordinate space (calibrated below via pointsPerImagePixel).
+            let outImage = Self.downscale(cg, maxEdge: Self.maxImageLongEdge)
+            let outW = outImage.width, outH = outImage.height
+
+            guard let jpeg = jpegEncode(outImage, quality: 0.72) else {
                 return Result(metadata: ["error": "jpeg encode failed", "frontmost": frontmost],
-                              imageBase64: nil, cgImage: cg)
+                              imageBase64: nil, cgImage: outImage)
             }
             let b64 = jpeg.base64EncodedString()
 
-            // Record the image-pixel ↔ screen-point mapping for InputSynth.
+            // Record the image-pixel ↔ screen-point mapping for InputSynth,
+            // calibrated to the (possibly downscaled) image we actually sent.
             // CGDisplayBounds gives the display's rect in GLOBAL CG points with
             // a top-left origin — exactly the space CGEvent posts into — so it
             // handles multi-display offsets without any NSScreen flip math.
             let bounds = CGDisplayBounds(display.displayID)
             Self.capturedDisplayOrigin = bounds.origin
-            Self.pointsPerImagePixel = bounds.width > 0 ? bounds.width / CGFloat(cfg.width) : 1.0
-            NSLog("ScreenCapture: \(cfg.width)x\(cfg.height), origin=(\(Int(bounds.origin.x)),\(Int(bounds.origin.y))), pt/px=\(Self.pointsPerImagePixel), frontmost=\(frontmost)")
+            Self.pointsPerImagePixel = bounds.width > 0 ? bounds.width / CGFloat(outW) : 1.0
+            NSLog("ScreenCapture: \(cfg.width)x\(cfg.height) -> sent \(outW)x\(outH), origin=(\(Int(bounds.origin.x)),\(Int(bounds.origin.y))), pt/px=\(Self.pointsPerImagePixel), frontmost=\(frontmost)")
 
             return Result(
                 metadata: [
                     "frontmost": frontmost,
-                    "image_size_px": "\(cfg.width)x\(cfg.height)",
+                    "image_size_px": "\(outW)x\(outH)",
                     "note": "Click coordinates are image pixels, origin TOP-LEFT, matching this screenshot exactly."
                 ],
                 imageBase64: b64,
-                cgImage: cg
+                cgImage: outImage
             )
         } catch {
             NSLog("ScreenCapture: failed: \(error.localizedDescription)")
@@ -110,5 +119,30 @@ final class ScreenCapture {
     private func jpegEncode(_ cg: CGImage, quality: Double) -> Data? {
         let rep = NSBitmapImageRep(cgImage: cg)
         return rep.representation(using: .jpeg, properties: [.compressionFactor: quality])
+    }
+
+    /// Longest edge (px) of the screenshot sent to the model. Native Retina
+    /// captures are huge; capping the long edge cuts latency + token cost with
+    /// negligible accuracy loss. No-op for displays already at/under the cap.
+    static let maxImageLongEdge = 1536
+
+    /// Downscale a CGImage so its longest edge is `maxEdge`, preserving aspect.
+    /// Returns the original if it's already small enough or on any failure.
+    private static func downscale(_ cg: CGImage, maxEdge: Int) -> CGImage {
+        let w = cg.width, h = cg.height
+        let longEdge = max(w, h)
+        guard longEdge > maxEdge else { return cg }
+        let scale = CGFloat(maxEdge) / CGFloat(longEdge)
+        let nw = max(1, Int((CGFloat(w) * scale).rounded()))
+        let nh = max(1, Int((CGFloat(h) * scale).rounded()))
+        let space = CGColorSpaceCreateDeviceRGB()
+        guard let ctx = CGContext(data: nil, width: nw, height: nh,
+                                  bitsPerComponent: 8, bytesPerRow: 0, space: space,
+                                  bitmapInfo: CGImageAlphaInfo.noneSkipLast.rawValue) else {
+            return cg
+        }
+        ctx.interpolationQuality = .high
+        ctx.draw(cg, in: CGRect(x: 0, y: 0, width: nw, height: nh))
+        return ctx.makeImage() ?? cg
     }
 }
