@@ -61,6 +61,24 @@ final class AppDelegate: NSObject, NSApplicationDelegate, ObservableObject {
     lazy var coordinator: AppCoordinator = AppCoordinator(settings: settings)
     private var bag = Set<AnyCancellable>()
 
+    func applicationWillFinishLaunching(_ notification: Notification) {
+        // Register for cursorvoice:// URLs (marketplace "Install in app" deep link).
+        NSAppleEventManager.shared().setEventHandler(
+            self, andSelector: #selector(handleURLEvent(_:reply:)),
+            forEventClass: AEEventClass(kInternetEventClass), andEventID: AEEventID(kAEGetURL))
+    }
+
+    /// Also handles URLs delivered via the modern AppKit path.
+    func application(_ application: NSApplication, open urls: [URL]) {
+        urls.forEach { PluginInstaller.handle($0) }
+    }
+
+    @objc private func handleURLEvent(_ event: NSAppleEventDescriptor, reply: NSAppleEventDescriptor) {
+        guard let str = event.paramDescriptor(forKeyword: AEKeyword(keyDirectObject))?.stringValue,
+              let url = URL(string: str) else { return }
+        PluginInstaller.handle(url)
+    }
+
     func applicationDidFinishLaunching(_ notification: Notification) {
         NSApp.setActivationPolicy(.accessory)
         coordinator.start()

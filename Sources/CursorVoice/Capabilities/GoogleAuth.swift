@@ -183,6 +183,9 @@ final class GoogleAuth: ObservableObject {
                 identity = id
                 if let d = try? JSONEncoder().encode(id) { defaults.set(d, forKey: "googleIdentity") }
                 NSLog("GoogleAuth: signed in as \(id.email)")
+                // Register this account with the community backend so the website
+                // recognizes it as connected (lets it publish plugins). Best-effort.
+                BackendRegister.register(idToken: idToken)
             } else {
                 lastError = "no id_token in response"
             }

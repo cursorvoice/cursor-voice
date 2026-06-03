@@ -81,6 +81,13 @@ cat > "$APP_BUNDLE/Contents/Info.plist" <<EOF
     <key>NSDesktopFolderUsageDescription</key><string>Cursor Voice may read files in Desktop you ask the assistant about.</string>
     <key>NSDocumentsFolderUsageDescription</key><string>Cursor Voice may read files in Documents you ask the assistant about.</string>
     <key>NSDownloadsFolderUsageDescription</key><string>Cursor Voice may read files in Downloads you ask the assistant about.</string>
+    <key>CFBundleURLTypes</key>
+    <array>
+      <dict>
+        <key>CFBundleURLName</key><string>${BUNDLE_ID}.install</string>
+        <key>CFBundleURLSchemes</key><array><string>cursorvoice</string></array>
+      </dict>
+    </array>
 </dict>
 </plist>
 EOF
