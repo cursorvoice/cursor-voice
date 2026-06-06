@@ -318,8 +318,9 @@ final class AppCoordinator: ObservableObject {
       wait_for_text("…") or wait(seconds) and then act once it's there — don't guess timing.
 
     CODING TASKS:
-    • If the user asks you to write, refactor, explain, or run code and the Codex CLI is
-      available, prefer run_codex(task) — it uses their Codex subscription, not the API key.
+    • If the user asks you to write, refactor, explain, or run code and the `codex` plugin
+      is installed (tool name plugin_codex), prefer it — it uses their Codex subscription,
+      not the API key. If it isn't installed, suggest installing it from the marketplace.
 
     HELP / "WHAT CAN YOU DO":
     • If the user asks what you can do (or seems unsure / hesitant), give a SHORT spoken

@@ -399,18 +399,6 @@ actor ToolHandler {
         ],
         [
             "type": "function",
-            "name": "run_codex",
-            "description": "Delegate a CODING task to the OpenAI Codex CLI if the user has it installed and signed in (it uses their ChatGPT/Codex subscription, NOT the API key). Best for writing/refactoring/explaining code or running a repo task. Pass the whole task as one instruction. Best for quick tasks (long ones may time out).",
-            "parameters": [
-                "type": "object",
-                "properties": [
-                    "task": ["type": "string", "description": "The full coding task, e.g. 'refactor utils.py to use pathlib and add type hints'"]
-                ],
-                "required": ["task"]
-            ]
-        ],
-        [
-            "type": "function",
             "name": "wait_for_text",
             "description": "Poll the screen with OCR until the given text appears, then return. Use before acting on something that shows up after a delay (a dialog, a button, a loaded page) instead of guessing how long to wait.",
             "parameters": [
@@ -625,7 +613,6 @@ actor ToolHandler {
         case "mail_compose":             return "drafting an email"
         case "run_applescript":          return "running script"
         case "run_shell":                return "running command"
-        case "run_codex":                return "asking Codex"
         case "wait_for_text":            return "waiting for the screen"
         case "wait":                     return "waiting"
         case "open_app":                 return "opening app"
@@ -655,7 +642,7 @@ actor ToolHandler {
         "open_app", "activate_app", "set_window_bounds",
         "calendar_add_event", "reminders_add", "notes_create", "mail_compose",
         "browser_click_text", "browser_run_js",
-        "set_clipboard", "move_file", "run_codex"
+        "set_clipboard", "move_file"
     ]
 
     func dispatch(name: String, argsJSON: String) async -> ToolDispatchResult {
@@ -1054,15 +1041,6 @@ actor ToolHandler {
         case "run_shell":
             let cmd = (args["command"] as? String) ?? ""
             NSLog("Tool: run_shell: \(cmd.prefix(120))")
-            let out = await ShellRunner.run(cmd)
-            return ToolDispatchResult(outputJSON: encode(out), attachedImageBase64: nil)
-
-        case "run_codex":
-            let task = (args["task"] as? String) ?? ""
-            NSLog("Tool: run_codex: \(task.prefix(120))")
-            let quoted = "'" + task.replacingOccurrences(of: "'", with: "'\\''") + "'"
-            // Handle the missing-CLI case inline so we return a helpful message.
-            let cmd = "command -v codex >/dev/null 2>&1 || { echo 'CODEX_CLI_NOT_FOUND — install the Codex CLI and run: codex login'; exit 0; }; codex exec \(quoted)"
             let out = await ShellRunner.run(cmd)
             return ToolDispatchResult(outputJSON: encode(out), attachedImageBase64: nil)
 
