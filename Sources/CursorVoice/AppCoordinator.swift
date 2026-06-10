@@ -175,6 +175,9 @@ final class AppCoordinator: ObservableObject {
         client.onAudioLevel = { [weak self] level in
             Task { @MainActor in self?.orbState.audioLevel = level }
         }
+        client.onOutputLevel = { [weak self] level in
+            Task { @MainActor in self?.orbState.outputLevel = level }
+        }
         client.onTranscript = { [weak self] text in
             Task { @MainActor in self?.orbState.lastTranscript = text }
         }

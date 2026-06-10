@@ -19,6 +19,8 @@ final class RealtimeClient: NSObject, URLSessionWebSocketDelegate {
     var onInputActivity: ((Bool) -> Void)?
     var onToolStart: ((String) -> Void)?
     var onToolEnd: (() -> Void)?
+    /// Assistant playback level (0…1) — drives the orb's pulse while it speaks.
+    var onOutputLevel: ((Float) -> Void)?
     /// Fired on every `response.done` with the API's usage payload + the model
     /// that produced it, so the cost meter can accumulate spend.
     var onUsage: ((_ usage: [String: Any], _ model: String) -> Void)?
@@ -50,7 +52,7 @@ final class RealtimeClient: NSObject, URLSessionWebSocketDelegate {
             self.recentInputPeak = max(level, self.recentInputPeak * 0.85)
             self.onAudioLevel?(level)
         }
-        audio.onOutputLevel = { _ in }
+        audio.onOutputLevel = { [weak self] level in self?.onOutputLevel?(level) }
 
         // Hook tool activity (for the cursor halo) — forward into the client's callback.
         Task { [weak self] in
@@ -361,7 +363,14 @@ final class RealtimeClient: NSObject, URLSessionWebSocketDelegate {
             // real transcript — this is what stops the "ok ok ok" loop when the
             // mic only hears noise/silence.
             let transcript = (obj["transcript"] as? String) ?? ""
-            if Self.isMeaningfulSpeech(transcript) {
+            // Never start a SECOND response: if a turn completed while the
+            // assistant is still responding/speaking (e.g. an echo turn the
+            // barge gate ignored), creating a response here would race the
+            // active one ("already has an active response") and produce
+            // double-replies. Real interruptions go through barge() instead.
+            if activeResponseId != nil || audio.isOutputActive {
+                NSLog("Realtime: turn completed mid-response — not responding (\"\(transcript.prefix(40))\")")
+            } else if Self.isMeaningfulSpeech(transcript) {
                 NSLog("Realtime: user said \"\(transcript)\" → responding")
                 send(event: ["type": "response.create"])
             } else {

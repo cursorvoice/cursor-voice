@@ -134,7 +134,11 @@ struct OrbView: View {
     }
 
     private var statusPill: some View {
-        Text(statusText)
+        HStack(spacing: 5) {
+            Circle().fill(auroraShadow).frame(width: 6, height: 6)
+                .shadow(color: auroraShadow.opacity(0.9), radius: 3)
+            Text(statusText)
+        }
             .font(.system(size: 11, weight: .semibold, design: .rounded))
             .foregroundStyle(.white.opacity(0.96))
             .multilineTextAlignment(.center)
@@ -263,21 +267,58 @@ struct OrbView: View {
         sin(t * 1.1) * 0.5 + 0.5
     }
 
-    private var auroraShadow: Color {
-        Color(red: 0.55, green: 0.30, blue: 0.95)
+    // MARK: - State-aware aurora (orb states & feedback)
+    // Each state gets its own palette so you can SEE what it's doing at a glance:
+    // listening = full aurora · thinking = cool blues · acting = mint/teal ·
+    // speaking = warm violet/pink · error = ember.
+
+    private var stateColors: [Color] {
+        if case .error = state.connection {
+            return [Color(red: 0.95, green: 0.30, blue: 0.30),
+                    Color(red: 1.00, green: 0.55, blue: 0.30),
+                    Color(red: 0.80, green: 0.20, blue: 0.40),
+                    Color(red: 0.95, green: 0.30, blue: 0.30)]
+        }
+        if state.activeTool != nil {                    // acting — hands on your Mac
+            return [Color(red: 0.25, green: 0.90, blue: 0.75),
+                    Color(red: 0.40, green: 0.78, blue: 1.00),
+                    Color(red: 0.42, green: 0.97, blue: 0.90),
+                    Color(red: 0.30, green: 0.70, blue: 0.95),
+                    Color(red: 0.25, green: 0.90, blue: 0.75)]
+        }
+        switch state.connection {
+        case .thinking:
+            return [Color(red: 0.35, green: 0.45, blue: 1.00),
+                    Color(red: 0.40, green: 0.78, blue: 1.00),
+                    Color(red: 0.55, green: 0.40, blue: 0.98),
+                    Color(red: 0.35, green: 0.45, blue: 1.00)]
+        case .speaking:
+            return [Color(red: 0.72, green: 0.35, blue: 1.00),
+                    Color(red: 0.97, green: 0.45, blue: 0.78),
+                    Color(red: 0.95, green: 0.55, blue: 0.95),
+                    Color(red: 0.72, green: 0.35, blue: 1.00)]
+        default:                                        // listening / idle — full aurora
+            return [Color(red: 0.55, green: 0.30, blue: 0.95),
+                    Color(red: 0.97, green: 0.45, blue: 0.78),
+                    Color(red: 0.40, green: 0.78, blue: 1.00),
+                    Color(red: 0.42, green: 0.97, blue: 0.90),
+                    Color(red: 0.55, green: 0.30, blue: 0.95)]
+        }
     }
 
+    private var auroraShadow: Color { stateColors[0] }
+
     private func auroraGradient(time t: TimeInterval) -> AngularGradient {
-        AngularGradient(
-            colors: [
-                Color(red: 0.55, green: 0.30, blue: 0.95),   // violet
-                Color(red: 0.97, green: 0.45, blue: 0.78),   // pink
-                Color(red: 0.40, green: 0.78, blue: 1.00),   // sky
-                Color(red: 0.42, green: 0.97, blue: 0.90),   // mint
-                Color(red: 0.55, green: 0.30, blue: 0.95)
-            ],
+        // thinking spins faster (working), speaking sways gently
+        let speed: Double = {
+            if state.activeTool != nil { return 70 }
+            if case .thinking = state.connection { return 90 }
+            return 45
+        }()
+        return AngularGradient(
+            colors: stateColors,
             center: .center,
-            angle: .degrees(t.truncatingRemainder(dividingBy: 8) * 45)
+            angle: .degrees(t.truncatingRemainder(dividingBy: 8) * speed)
         )
     }
 }

@@ -30,6 +30,8 @@ private struct MenuContent: View {
 
     var body: some View {
         Button("Summon Orb") { coordinator.toggle() }
+        Button("Stop & Dismiss") { coordinator.deactivate() }
+            .keyboardShortcut(".")
         Divider()
         SettingsLink { Text("Settings…") }
             .keyboardShortcut(",")
@@ -40,6 +42,7 @@ private struct MenuContent: View {
                 Self.frontSettings()
             })
         Divider()
+        Text("Cursor Voice v\((Bundle.main.infoDictionary?["CFBundleShortVersionString"] as? String) ?? "")")
         Button("Quit Cursor Voice") { NSApp.terminate(nil) }
             .keyboardShortcut("q")
     }
