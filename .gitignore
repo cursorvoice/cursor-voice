@@ -12,3 +12,4 @@ CursorVoice.xcodeproj/
 
 # Internal notes — not for the public repo
 _internal/
+.claude/
