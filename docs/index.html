@@ -230,11 +230,13 @@ h1 .grad{background:var(--grad);background-size:300% 100%;-webkit-background-cli
   font-weight:700;padding:2px 7px;border-radius:5px;font-family:'JetBrains Mono',monospace;white-space:nowrap}
 .demo-screen.scan .hlbox{opacity:1;transition-delay:1.2s}
 /* the orb */
-.demo-orb{position:absolute;right:13%;top:16%;width:46px;height:46px;border-radius:50%;z-index:5;
+.demo-orb{position:absolute;right:12%;top:14%;width:66px;height:66px;border-radius:50%;z-index:5;
   background:url('assets/orb-logo.png') center/cover no-repeat;
-  box-shadow:0 0 28px rgba(140,76,242,.7),0 0 70px rgba(140,76,242,.35);
+  box-shadow:0 0 30px rgba(140,76,242,.7),0 0 80px rgba(140,76,242,.35);
+  animation:orbSpin 18s linear infinite;
   transition:transform .4s var(--ease)}
-.demo-orb::after{content:"";position:absolute;inset:-30%;border-radius:50%;border:1.5px solid rgba(140,76,242,.4);
+@keyframes orbSpin{to{rotate:360deg}}
+.demo-orb::after{content:"";position:absolute;inset:-26%;border-radius:50%;border:1.5px solid rgba(140,76,242,.4);
   animation:ringPulse 2.2s var(--ease) infinite}
 @keyframes ringPulse{0%{transform:scale(.7);opacity:.9}100%{transform:scale(1.25);opacity:0}}
 .demo-screen.thinking .demo-orb{transform:scale(1.12)}
