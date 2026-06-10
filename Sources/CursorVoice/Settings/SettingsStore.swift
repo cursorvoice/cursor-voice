@@ -82,6 +82,8 @@ final class SettingsStore: ObservableObject {
     /// Off by default — on speakers, the mic hears the assistant and it would
     /// interrupt itself. Best enabled only with headphones.
     @Published var allowBargeIn: Bool
+    /// Orb color theme: "aurora" (default) · "ocean" · "sunset" · "forest" · "mono".
+    @Published var orbTheme: String
 
     private let keychain = KeychainStore(service: "com.cursorvoice.app", account: "openai-api-key")
     private let defaults = UserDefaults.standard
@@ -101,6 +103,7 @@ final class SettingsStore: ObservableObject {
         self.handsFree = defaults.bool(forKey: "handsFree")
         self.interactionMode = defaults.string(forKey: "interactionMode") ?? "toggle"
         self.allowBargeIn = defaults.object(forKey: "allowBargeIn") as? Bool ?? true
+        self.orbTheme = defaults.string(forKey: "orbTheme") ?? "aurora"
 
         if let data = defaults.data(forKey: "hotkey"),
            let spec = try? JSONDecoder().decode(HotkeySpec.self, from: data) {
@@ -142,11 +145,12 @@ final class SettingsStore: ObservableObject {
     func setHandsFree(_ v: Bool) { handsFree = v; defaults.set(v, forKey: "handsFree") }
     func setInteractionMode(_ v: String) { interactionMode = v; defaults.set(v, forKey: "interactionMode") }
     func setAllowBargeIn(_ v: Bool) { allowBargeIn = v; defaults.set(v, forKey: "allowBargeIn") }
+    func setOrbTheme(_ v: String) { orbTheme = v; defaults.set(v, forKey: "orbTheme") }
 
     /// Wipe persisted UserDefaults + Keychain and reset published state to defaults.
     /// The app keeps running; user can re-enter the API key afterwards.
     func resetAll() {
-        for key in ["hotkey", "model", "voice", "wakeWordEnabled", "wakeWordPhrase", "inputDeviceUID", ShellRunner.allowRiskyKey, "dryRun", "verbosity", "ambientContext", "visionAssist", "handsFree", "interactionMode", "allowBargeIn"] {
+        for key in ["hotkey", "model", "voice", "wakeWordEnabled", "wakeWordPhrase", "inputDeviceUID", ShellRunner.allowRiskyKey, "dryRun", "verbosity", "ambientContext", "visionAssist", "handsFree", "interactionMode", "allowBargeIn", "orbTheme"] {
             defaults.removeObject(forKey: key)
         }
         try? keychain.write("")
@@ -165,6 +169,7 @@ final class SettingsStore: ObservableObject {
         handsFree = false
         interactionMode = "toggle"
         allowBargeIn = true
+        orbTheme = "aurora"
     }
 
     func openSettings() {

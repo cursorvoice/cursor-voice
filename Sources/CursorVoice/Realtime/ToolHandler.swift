@@ -424,6 +424,54 @@ actor ToolHandler {
         ],
         [
             "type": "function",
+            "name": "macro_record_start",
+            "description": "Start recording a macro (a reusable skill). Every action performed after this is captured until macro_record_stop. Use when the user says 'record a macro called …' / 'let me teach you …'.",
+            "parameters": [
+                "type": "object",
+                "properties": [
+                    "name": ["type": "string", "description": "Short name for the macro, e.g. 'morning setup'"]
+                ],
+                "required": ["name"]
+            ]
+        ],
+        [
+            "type": "function",
+            "name": "macro_record_stop",
+            "description": "Stop recording and save the macro. Use when the user says 'stop recording' / 'that's it' / 'save the macro'.",
+            "parameters": ["type": "object", "properties": [:] as [String: Any], "required": [] as [String]]
+        ],
+        [
+            "type": "function",
+            "name": "macro_run",
+            "description": "Replay a saved macro by name — runs its recorded steps in order. Use when the user says 'run my … macro' / 'do my … routine'.",
+            "parameters": [
+                "type": "object",
+                "properties": [
+                    "name": ["type": "string"]
+                ],
+                "required": ["name"]
+            ]
+        ],
+        [
+            "type": "function",
+            "name": "macro_list",
+            "description": "List the user's saved macros (names + step counts).",
+            "parameters": ["type": "object", "properties": [:] as [String: Any], "required": [] as [String]]
+        ],
+        [
+            "type": "function",
+            "name": "macro_delete",
+            "description": "Delete a saved macro by name.",
+            "parameters": [
+                "type": "object",
+                "properties": [
+                    "name": ["type": "string"]
+                ],
+                "required": ["name"]
+            ]
+        ],
+        [
+            "type": "function",
             "name": "open_app",
             "description": "Open (launch) an application by display name (e.g. \"Safari\", \"Visual Studio Code\") or bundle id. Launches it if it isn't already running. Prefer this over AppleScript for opening apps.",
             "parameters": [
@@ -615,6 +663,11 @@ actor ToolHandler {
         case "run_shell":                return "running command"
         case "wait_for_text":            return "waiting for the screen"
         case "wait":                     return "waiting"
+        case "macro_record_start":       return "recording macro"
+        case "macro_record_stop":        return "saving macro"
+        case "macro_run":                return "running macro"
+        case "macro_list":               return "listing macros"
+        case "macro_delete":             return "deleting macro"
         case "open_app":                 return "opening app"
         case "activate_app":             return "switching apps"
         case "list_apps":                return "listing apps"
@@ -642,14 +695,26 @@ actor ToolHandler {
         "open_app", "activate_app", "set_window_bounds",
         "calendar_add_event", "reminders_add", "notes_create", "mail_compose",
         "browser_click_text", "browser_run_js",
-        "set_clipboard", "move_file"
+        "set_clipboard", "move_file", "macro_run", "macro_delete"
     ]
+
+    // Macro recording / replay state ("teach a skill").
+    private var recordingMacro: MacroStore.Macro? = nil
+    private var isReplayingMacro = false
 
     func dispatch(name: String, argsJSON: String) async -> ToolDispatchResult {
         let args = (try? JSONSerialization.jsonObject(with: Data(argsJSON.utf8)) as? [String: Any]) ?? [:]
         let label = friendlyLabel(for: name)
         onToolStart?(label)
         defer { onToolEnd?() }
+
+        // While recording a macro, capture every action that changes the Mac
+        // (not the macro-control tools themselves, and not during replay).
+        if recordingMacro != nil, !isReplayingMacro, !name.hasPrefix("macro_"),
+           Self.mutatingTools.contains(name) || PluginManager.isPlugin(name) {
+            recordingMacro?.steps.append(MacroStore.Step(tool: name, argsJSON: argsJSON))
+            NSLog("Macro: recorded step \(name)")
+        }
 
         // Dry-run mode (Settings → Behavior): describe mutating actions instead
         // of performing them. Read-only tools still run so the model can plan.
@@ -1141,6 +1206,74 @@ actor ToolHandler {
             let path = (args["path"] as? String) ?? ""
             NSLog("Tool: read_file \(path)")
             return ToolDispatchResult(outputJSON: encode(DocReader.readFile(path: path)), attachedImageBase64: nil)
+
+        case "macro_record_start":
+            let mname = ((args["name"] as? String) ?? "").trimmingCharacters(in: .whitespaces)
+            guard !mname.isEmpty else {
+                return ToolDispatchResult(outputJSON: encode(["error": "macro needs a name"]), attachedImageBase64: nil)
+            }
+            recordingMacro = MacroStore.Macro(name: mname.lowercased(), steps: [], createdAt: Date())
+            NSLog("Macro: recording '\(mname)'")
+            return ToolDispatchResult(outputJSON: encode([
+                "ok": true, "recording": mname,
+                "note": "Recording started. Every action you perform from now on is captured. Tell the user to do the steps, then say 'stop recording'."
+            ]), attachedImageBase64: nil)
+
+        case "macro_record_stop":
+            guard let macro = recordingMacro else {
+                return ToolDispatchResult(outputJSON: encode(["error": "not recording a macro"]), attachedImageBase64: nil)
+            }
+            recordingMacro = nil
+            guard !macro.steps.isEmpty else {
+                return ToolDispatchResult(outputJSON: encode([
+                    "ok": false, "note": "No actions were recorded, so nothing was saved."
+                ]), attachedImageBase64: nil)
+            }
+            MacroStore.save(macro)
+            NSLog("Macro: saved '\(macro.name)' (\(macro.steps.count) steps)")
+            return ToolDispatchResult(outputJSON: encode([
+                "ok": true, "saved": macro.name, "steps": macro.steps.count,
+                "note": "Saved. The user can replay it anytime by saying e.g. 'run my \(macro.name) macro'."
+            ]), attachedImageBase64: nil)
+
+        case "macro_list":
+            let macros = MacroStore.list().map { ["name": $0.name, "steps": $0.steps.count] as [String: Any] }
+            return ToolDispatchResult(outputJSON: encode(["count": macros.count, "macros": macros]),
+                                      attachedImageBase64: nil)
+
+        case "macro_delete":
+            let mname = (args["name"] as? String) ?? ""
+            let ok = MacroStore.delete(mname)
+            let out: [String: Any] = ok ? ["ok": true, "deleted": mname]
+                                        : ["error": "no macro named \(mname)"]
+            return ToolDispatchResult(outputJSON: encode(out), attachedImageBase64: nil)
+
+        case "macro_run":
+            let mname = (args["name"] as? String) ?? ""
+            guard let macro = MacroStore.load(mname) else {
+                let names = MacroStore.list().map(\.name)
+                return ToolDispatchResult(outputJSON: encode([
+                    "error": "no macro named \(mname)", "available": names
+                ]), attachedImageBase64: nil)
+            }
+            NSLog("Macro: replaying '\(macro.name)' (\(macro.steps.count) steps)")
+            isReplayingMacro = true
+            defer { isReplayingMacro = false }
+            var ran = 0
+            var failures: [[String: Any]] = []
+            for step in macro.steps {
+                let r = await dispatch(name: step.tool, argsJSON: step.argsJSON)
+                ran += 1
+                if r.outputJSON.contains("\"error\"") {
+                    failures.append(["step": ran, "tool": step.tool])
+                }
+                // Let the UI settle between steps so replays land reliably.
+                try? await Task.sleep(nanoseconds: 400_000_000)
+            }
+            return await confirmWithScreenshot([
+                "ok": failures.isEmpty, "macro": macro.name,
+                "steps_run": ran, "failed_steps": failures
+            ])
 
         default:
             // Community plugin tool?

@@ -253,6 +253,25 @@ private struct AdvancedTab: View {
             } header: { Text("Behavior") }
 
             Section {
+                Picker("Orb theme", selection: Binding(
+                    get: { settings.orbTheme },
+                    set: { settings.setOrbTheme($0) })) {
+                    Text("Aurora").tag("aurora")
+                    Text("Ocean").tag("ocean")
+                    Text("Sunset").tag("sunset")
+                    Text("Forest").tag("forest")
+                    Text("Mono").tag("mono")
+                }
+                HStack(spacing: 8) {
+                    ForEach(Array(OrbView.themePalette(settings.orbTheme).prefix(4).enumerated()), id: \.offset) { _, c in
+                        Circle().fill(c).frame(width: 14, height: 14)
+                    }
+                    Text("Colors the orb while it listens. State colors (thinking, acting, errors) stay the same so feedback is always readable.")
+                        .font(.caption).foregroundStyle(.secondary)
+                }
+            } header: { Text("Appearance") }
+
+            Section {
                 Toggle("Vision-assist — describe the screen aloud", isOn: Binding(
                     get: { settings.visionAssist },
                     set: { settings.setVisionAssist($0) }))
@@ -403,6 +422,7 @@ private struct UsageTab: View {
 private struct PluginsTab: View {
     @State private var plugins: [PluginManager.Tool] = []
     @State private var pendingDelete: PluginManager.Tool?
+    @State private var macros: [MacroStore.Macro] = []
 
     private static let marketplace = "https://community.cursorvoice.app"
     private static let submit = "https://community.cursorvoice.app/submit.html"
@@ -462,6 +482,32 @@ private struct PluginsTab: View {
             }
 
             Section {
+                if macros.isEmpty {
+                    Text("No macros yet. Say “record a macro called morning setup”, do the steps by voice, then “stop recording”. Replay anytime with “run my morning setup macro”.")
+                        .font(.caption).foregroundStyle(.secondary)
+                } else {
+                    ForEach(macros, id: \.name) { m in
+                        HStack(spacing: 12) {
+                            Image(systemName: "wand.and.stars")
+                                .font(.system(size: 15)).foregroundStyle(.tint).frame(width: 22)
+                            VStack(alignment: .leading, spacing: 2) {
+                                Text(m.name.capitalized).fontWeight(.medium)
+                                Text("\(m.steps.count) step\(m.steps.count == 1 ? "" : "s") · say “run my \(m.name) macro”")
+                                    .font(.caption).foregroundStyle(.secondary)
+                            }
+                            Spacer()
+                            Button {
+                                MacroStore.delete(m.name); reloadMacros()
+                            } label: { Image(systemName: "trash") }
+                                .buttonStyle(.borderless).foregroundStyle(.secondary)
+                                .help("Delete this macro")
+                        }
+                        .padding(.vertical, 2)
+                    }
+                }
+            } header: { Text("Macros — skills you taught it") }
+
+            Section {
                 Button {
                     open(Self.marketplace)
                 } label: {
@@ -493,7 +539,11 @@ private struct PluginsTab: View {
         }
     }
 
-    private func reload() { plugins = PluginManager.load().sorted { friendly($0.name) < friendly($1.name) } }
+    private func reload() {
+        plugins = PluginManager.load().sorted { friendly($0.name) < friendly($1.name) }
+        reloadMacros()
+    }
+    private func reloadMacros() { macros = MacroStore.list() }
     private func open(_ s: String) { if let u = URL(string: s) { NSWorkspace.shared.open(u) } }
     private func friendly(_ n: String) -> String {
         n.replacingOccurrences(of: "plugin_", with: "").replacingOccurrences(of: "_", with: " ").capitalized

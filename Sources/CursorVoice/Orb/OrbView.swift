@@ -297,7 +297,38 @@ struct OrbView: View {
                     Color(red: 0.97, green: 0.45, blue: 0.78),
                     Color(red: 0.95, green: 0.55, blue: 0.95),
                     Color(red: 0.72, green: 0.35, blue: 1.00)]
-        default:                                        // listening / idle — full aurora
+        default:                                        // listening / idle — themed
+            return Self.themePalette(UserDefaults.standard.string(forKey: "orbTheme") ?? "aurora")
+        }
+    }
+
+    /// User-selectable orb themes (Settings → Advanced → Appearance). Applies to
+    /// the idle/listening look; thinking/acting/speaking/error keep their
+    /// semantic colors so state feedback stays readable on every theme.
+    static func themePalette(_ name: String) -> [Color] {
+        switch name {
+        case "ocean":
+            return [Color(red: 0.15, green: 0.40, blue: 0.95),
+                    Color(red: 0.20, green: 0.70, blue: 1.00),
+                    Color(red: 0.30, green: 0.95, blue: 0.90),
+                    Color(red: 0.10, green: 0.55, blue: 0.85),
+                    Color(red: 0.15, green: 0.40, blue: 0.95)]
+        case "sunset":
+            return [Color(red: 1.00, green: 0.45, blue: 0.25),
+                    Color(red: 0.98, green: 0.30, blue: 0.55),
+                    Color(red: 1.00, green: 0.70, blue: 0.30),
+                    Color(red: 0.85, green: 0.25, blue: 0.65),
+                    Color(red: 1.00, green: 0.45, blue: 0.25)]
+        case "forest":
+            return [Color(red: 0.15, green: 0.80, blue: 0.45),
+                    Color(red: 0.55, green: 0.95, blue: 0.40),
+                    Color(red: 0.20, green: 0.90, blue: 0.75),
+                    Color(red: 0.10, green: 0.60, blue: 0.40),
+                    Color(red: 0.15, green: 0.80, blue: 0.45)]
+        case "mono":
+            return [Color(white: 0.95), Color(white: 0.60),
+                    Color(white: 0.85), Color(white: 0.55), Color(white: 0.95)]
+        default: // aurora
             return [Color(red: 0.55, green: 0.30, blue: 0.95),
                     Color(red: 0.97, green: 0.45, blue: 0.78),
                     Color(red: 0.40, green: 0.78, blue: 1.00),

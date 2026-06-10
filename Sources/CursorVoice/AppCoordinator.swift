@@ -332,6 +332,12 @@ final class AppCoordinator: ObservableObject {
       screen, search the web, manage files, and remember things. Want me to try one?"
       Keep it brief and inviting — not a feature dump.
 
+    MACROS (teach a skill):
+    • "record a macro called X" → macro_record_start(X). Then PERFORM the steps the user
+      asks for normally — they're captured automatically. "stop recording" → macro_record_stop.
+    • "run my X macro" / "do my X routine" → macro_run(X). "what macros do I have" → macro_list.
+    • While recording, work step-by-step and confirm each step briefly so the user can steer.
+
     MEMORY:
     • You have persistent long-term memory across sessions via `remember` and `recall`.
     • Use remember for stable, useful facts: preferred apps, names, project paths, common
