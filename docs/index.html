@@ -107,8 +107,8 @@ nav .wrap{display:flex;align-items:center;justify-content:space-between;height:6
 .brand{display:flex;align-items:center;gap:11px;font-weight:650;font-size:16px;color:var(--fg);letter-spacing:-.01em}
 .brand:hover{text-decoration:none}
 .brand .mark{width:26px;height:26px;border-radius:50%;flex:none;
-  background:conic-gradient(from 0deg,var(--violet),var(--pink),var(--sky),var(--mint),var(--violet));
-  box-shadow:0 0 18px rgba(140,76,242,.65);animation:spin 12s linear infinite}
+  background:url('assets/orb-logo.png') center/cover no-repeat;
+  box-shadow:0 0 18px rgba(140,76,242,.65)}
 @keyframes spin{to{transform:rotate(360deg)}}
 .nav-links{display:flex;align-items:center;gap:26px}
 .nav-links>a{color:var(--dim);font-size:14px;font-weight:480;transition:color .2s}
@@ -231,11 +231,9 @@ h1 .grad{background:var(--grad);background-size:300% 100%;-webkit-background-cli
 .demo-screen.scan .hlbox{opacity:1;transition-delay:1.2s}
 /* the orb */
 .demo-orb{position:absolute;right:13%;top:16%;width:46px;height:46px;border-radius:50%;z-index:5;
-  background:conic-gradient(from 0deg,var(--violet),var(--pink),var(--sky),var(--mint),var(--violet));
-  animation:spin 8s linear infinite;box-shadow:0 0 28px rgba(140,76,242,.7),0 0 70px rgba(140,76,242,.35);
+  background:url('assets/orb-logo.png') center/cover no-repeat;
+  box-shadow:0 0 28px rgba(140,76,242,.7),0 0 70px rgba(140,76,242,.35);
   transition:transform .4s var(--ease)}
-.demo-orb::before{content:"";position:absolute;inset:17%;border-radius:50%;
-  background:radial-gradient(circle at 34% 28%,rgba(255,255,255,.95),rgba(255,255,255,.35) 42%,rgba(255,255,255,.06) 75%)}
 .demo-orb::after{content:"";position:absolute;inset:-30%;border-radius:50%;border:1.5px solid rgba(140,76,242,.4);
   animation:ringPulse 2.2s var(--ease) infinite}
 @keyframes ringPulse{0%{transform:scale(.7);opacity:.9}100%{transform:scale(1.25);opacity:0}}
@@ -418,10 +416,8 @@ details .body a{font-weight:550}
 .final h2{font-size:clamp(32px,5vw,52px)}
 .final .lead{margin:0 auto 32px}
 .final .orb-mini{width:74px;height:74px;border-radius:50%;margin:0 auto 26px;
-  background:conic-gradient(from 0deg,var(--violet),var(--pink),var(--sky),var(--mint),var(--violet));
-  animation:spin 9s linear infinite;box-shadow:0 0 44px rgba(140,76,242,.6),0 0 110px rgba(140,76,242,.3);position:relative}
-.final .orb-mini::before{content:"";position:absolute;inset:16%;border-radius:50%;
-  background:radial-gradient(circle at 34% 28%,rgba(255,255,255,.95),rgba(255,255,255,.35) 45%,rgba(255,255,255,.05) 78%)}
+  background:url('assets/orb-logo.png') center/cover no-repeat;
+  animation:spin 14s linear infinite;box-shadow:0 0 44px rgba(140,76,242,.6),0 0 110px rgba(140,76,242,.3);position:relative}
 
 /* ════════════════════ footer ════════════════════ */
 footer{border-top:1px solid var(--border);padding:46px 0;margin-top:40px}
